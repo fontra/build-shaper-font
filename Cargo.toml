@@ -1,5 +1,7 @@
 [package]
 name = "build-shaper-font"
+description = "Build a minimal font for shaping with HarfBuzz in Fontra"
+repository = "https://github.com/fontra/build-shaper-font"
 version = "0.1.0"
 authors = ["Khaled Hosny <khaled@aliftype.com>"]
 license = "GPL-3.0-or-later"
