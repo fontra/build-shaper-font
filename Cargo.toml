@@ -2,6 +2,7 @@
 name = "build-shaper-font"
 version = "0.1.0"
 authors = ["Khaled Hosny <khaled@aliftype.com>"]
+license = "GPL-3.0-or-later"
 edition = "2018"
 
 [lib]
