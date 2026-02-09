@@ -4,13 +4,25 @@ A minimal font compiler to produce "shaper fonts", minimal fonts to feed to Harf
 
 ## Build
 
-For Node.js:
+### Prerequisites
+
+- Rust
+- wasm-pack
+
+E.g. with homebrew:
+
+```
+brew install rust
+brew install wasm-pack
+```
+
+### For Node.js:
 
 ```
 wasm-pack build --target nodejs
 ```
 
-For the browser:
+### For the browser:
 
 ```
 wasm-pack build --target web
@@ -18,13 +30,13 @@ wasm-pack build --target web
 
 ## Test
 
-For Node.js:
+### With Node.js:
 
 ```
 wasm-pack test --node
 ```
 
-For the browser:
+### With the browser:
 
 ```
 WASM_BINDGEN_USE_BROWSER=1 wasm-pack test --firefox --headless
