@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { buildShaperFont } from '../pkg/build_shaper_font.js';
+import { buildShaperFont, AxisInfo } from '../pkg/build_shaper_font.js';
 import harfbuzz from "harfbuzzjs";
 
 describe('buildShaperFont', function () {
@@ -67,6 +67,22 @@ feature mkmk {
     expect([insertMarkers[0].tag, insertMarkers[0].lookupId]).to.deep.equal(['kern', 1]);
     expect([insertMarkers[1].tag, insertMarkers[1].lookupId]).to.deep.equal(['mark', 1]);
     expect(messages).to.equal('');
+  });
+
+  it('Build font with variations', async function () {
+    const unitsPerEm = 1000;
+    const glyphOrder = ['.notdef', 'A', 'V'];
+    const featureSource = '';
+    const axes = [new AxisInfo('wght', 100, 400, 900)];
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, axes);
+    expect(fontData).to.not.equal(null);
+
+    let hb = await harfbuzz;
+    const blob = hb.createBlob(fontData);
+    const face = hb.createFace(blob);
+    expect(face.getAxisInfos()).to.deep.equal({
+      wght: { min: 100, default: 400, max: 900 }
+    });
   });
 
   it('Build font and shape with HarfBuzz', async function () {
