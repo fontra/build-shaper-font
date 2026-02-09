@@ -1,17 +1,21 @@
 use wasm_bindgen::prelude::*;
 
-use std::{path::Path, str::FromStr};
+use std::{collections::HashMap, fmt::Display, path::Path, str::FromStr};
 
 use fea_rs::{
-    compile::{validate, CompilationCtx, NopFeatureProvider, NopVariationInfo},
+    compile::{validate, CompilationCtx, NopFeatureProvider, VariationInfo},
     parse::{parse_root, SourceLoadError},
     DiagnosticSet, GlyphMap,
 };
-use fontdrasil::coords::UserCoord;
+use fontdrasil::{
+    coords::{NormalizedLocation, UserCoord},
+    types::Axis,
+};
 use write_fonts::{
     tables::{
         fvar::{AxisInstanceArrays, Fvar, VariationAxisRecord},
         name::NameRecord,
+        variations::VariationRegion,
     },
     types::{NameId, Tag},
 };
@@ -53,6 +57,81 @@ impl AxisInfo {
             default_value,
             max_value,
         }
+    }
+}
+
+struct SimpleVariationInfo {
+    axes: Vec<Axis>,
+}
+
+impl SimpleVariationInfo {
+    fn new(axis_infos: Vec<AxisInfo>) -> Self {
+        Self {
+            axes: axis_infos
+                .into_iter()
+                .map(|a| {
+                    let tag = Tag::from_str(&a.axis_tag).unwrap();
+                    let min = UserCoord::new(a.min_value);
+                    let default = UserCoord::new(a.default_value);
+                    let max = UserCoord::new(a.max_value);
+                    Axis {
+                        name: a.axis_tag,
+                        tag,
+                        min,
+                        default,
+                        max,
+                        hidden: false,
+                        converter: fontdrasil::coords::CoordConverter::default_normalization(
+                            min, default, max,
+                        ),
+                        localized_names: Default::default(),
+                    }
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct VariationError;
+
+impl std::error::Error for VariationError {}
+
+impl Display for VariationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("variation error")
+    }
+}
+
+impl VariationInfo for SimpleVariationInfo {
+    type Error = VariationError;
+
+    fn axis_count(&self) -> u16 {
+        self.axes.len() as u16
+    }
+
+    fn axis(&self, axis_tag: Tag) -> Option<(usize, &Axis)> {
+        self.axes.iter().enumerate().find_map(|(i, axis)| {
+            if axis_tag == axis.tag {
+                Some((i, axis))
+            } else {
+                None
+            }
+        })
+    }
+
+    fn resolve_variable_metric(
+        &self,
+        _locations: &HashMap<NormalizedLocation, i16>,
+    ) -> Result<(i16, Vec<(VariationRegion, i16)>), Self::Error> {
+        unimplemented!("Variable scalars are not supported")
+    }
+
+    fn resolve_glyphs_number_value(
+        &self,
+        _: &str,
+    ) -> Result<HashMap<NormalizedLocation, f64>, Self::Error> {
+        unimplemented!("Glyphs number values are not supported")
     }
 }
 
@@ -112,7 +191,13 @@ pub fn build_shaper_font(
         }
     }
 
-    let diagnostics = validate(&tree, &glyph_map, None::<&NopVariationInfo>);
+    let variation_info = if let Some(axes) = axes {
+        Some(SimpleVariationInfo::new(axes))
+    } else {
+        None
+    };
+
+    let diagnostics = validate(&tree, &glyph_map, variation_info.as_ref());
     if !diagnostics.is_empty() {
         messages.push(diagnostics.display().to_string());
         if diagnostics.has_errors() {
@@ -123,7 +208,7 @@ pub fn build_shaper_font(
     let mut ctx = CompilationCtx::new(
         &glyph_map,
         tree.source_map(),
-        None::<&NopVariationInfo>,
+        variation_info.as_ref(),
         None::<&NopFeatureProvider>,
         Default::default(),
     );
@@ -151,7 +236,7 @@ pub fn build_shaper_font(
             compilation.head = Some(head_table);
 
             let mut fvar_axes = Vec::new();
-            if let Some(axes) = axes {
+            if let Some(variation_info) = variation_info {
                 let mut name_table = compilation.name.take().unwrap_or_default();
                 let mut name_id = name_table
                     .name_record
@@ -163,20 +248,20 @@ pub fn build_shaper_font(
                     .checked_add(1)
                     .unwrap();
 
-                for axis in &axes {
+                for axis in &variation_info.axes {
                     name_table.name_record.push(NameRecord::new(
                         3,
                         1,
                         0x0409,
                         name_id,
-                        axis.axis_tag.clone().into(),
+                        axis.ui_label_name().to_string().into(),
                     ));
 
                     fvar_axes.push(VariationAxisRecord {
-                        axis_tag: Tag::from_str(&axis.axis_tag)?,
-                        min_value: UserCoord::new(axis.min_value).into(),
-                        default_value: UserCoord::new(axis.default_value).into(),
-                        max_value: UserCoord::new(axis.max_value).into(),
+                        axis_tag: axis.tag,
+                        min_value: axis.min.into(),
+                        default_value: axis.default.into(),
+                        max_value: axis.max.into(),
                         axis_name_id: name_id,
                         ..Default::default()
                     });
