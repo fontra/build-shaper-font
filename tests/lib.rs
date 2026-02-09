@@ -1,5 +1,3 @@
-//! Test suite for the Web and headless browsers.
-
 #![cfg(target_arch = "wasm32")]
 
 extern crate wasm_bindgen_test;
@@ -7,8 +5,6 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_test::*;
 
 use build_shaper_font::build_shaper_font;
-
-wasm_bindgen_test_configure!(run_in_browser);
 
 #[wasm_bindgen_test]
 fn test_build_shaper_font() {
