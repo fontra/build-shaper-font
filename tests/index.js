@@ -85,6 +85,67 @@ feature mkmk {
     });
   });
 
+  it('Build font with variable GPOS', async function () {
+    const unitsPerEm = 1000;
+    const glyphOrder = ['.notdef', 'A', 'V'];
+    const featureSource = `
+languagesystem DFLT dflt;
+
+feature kern {
+    pos A V (wght=400:-50 wght=900:0 wght=100:-100);
+} kern;
+ `;
+    const axes = [new AxisInfo('wght', 100, 400, 900)];
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, axes);
+    expect(fontData).to.not.equal(null);
+
+    let hb = await harfbuzz;
+    const blob = hb.createBlob(fontData);
+    const face = hb.createFace(blob);
+    const font = hb.createFont(face);
+
+    let fontFuncs = hb.createFontFuncs();
+    fontFuncs.setNominalGlyphFunc((_, codepoint) => {
+      const ch = String.fromCodePoint(codepoint);
+      if (glyphOrder.includes(ch)) {
+        return glyphOrder.indexOf(ch);
+      }
+      return 0;
+    });
+
+    fontFuncs.setGlyphHAdvanceFunc(() => {
+      return 100;
+    });
+
+    font.setFuncs(fontFuncs);
+
+    const buffer = hb.createBuffer();
+    buffer.addText('AV');
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    const positions = buffer.getGlyphPositions();
+    expect(positions[0].x_advance).to.equal(50);
+    expect(positions[1].x_advance).to.equal(100);
+
+    font.setVariations({ 'wght': 100 });
+    buffer.clearContents();
+    buffer.addText('AV');
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    const positions2 = buffer.getGlyphPositions();
+    expect(positions2[0].x_advance).to.equal(0);
+    expect(positions2[1].x_advance).to.equal(100);
+
+    font.setVariations({ 'wght': 900 });
+    buffer.clearContents();
+    buffer.addText('AV');
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    const positions3 = buffer.getGlyphPositions();
+    expect(positions3[0].x_advance).to.equal(100);
+    expect(positions3[1].x_advance).to.equal(100);
+  });
+
   it('Build font and shape with HarfBuzz', async function () {
     const unitsPerEm = 2000;
     const glyphOrder = ['.notdef', 'A', 'V'];
