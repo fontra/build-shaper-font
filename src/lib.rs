@@ -10,6 +10,7 @@ use fea_rs::{
 use fontdrasil::{
     coords::{NormalizedLocation, UserCoord},
     types::{Axes, Axis},
+    variations::VariationModel,
 };
 use write_fonts::{
     tables::{
@@ -18,6 +19,7 @@ use write_fonts::{
         variations::VariationRegion,
     },
     types::{NameId, Tag},
+    OtRound,
 };
 
 const MAX_DIAGNOSTICS: usize = 100;
@@ -122,11 +124,52 @@ impl VariationInfo for SimpleVariationInfo {
         })
     }
 
+    // Adapted from
+    // https://github.com/googlefonts/fontc/blob/982b5b5acc2749b7e8e4ed7bba1ed655a5b7981d/fontbe/src/features.rs#L317
     fn resolve_variable_metric(
         &self,
-        _locations: &HashMap<NormalizedLocation, i16>,
+        values: &HashMap<NormalizedLocation, i16>,
     ) -> Result<(i16, Vec<(VariationRegion, i16)>), Self::Error> {
-        unimplemented!("Variable scalars are not supported")
+        // Compute deltas using f64 as 1d point and delta, then ship them home as i16
+        let point_seqs: HashMap<_, _> = values
+            .iter()
+            .map(|(pos, value)| (pos.clone(), vec![*value as f64]))
+            .collect();
+
+        let locations = point_seqs.keys().into_iter().cloned().collect();
+        let var_model = VariationModel::new(locations, self.axes.axis_order());
+
+        // Only 1 value per region for our input
+        let deltas: Vec<_> = var_model
+            .deltas(&point_seqs)
+            .map_err(|_| VariationError)?
+            .into_iter()
+            .map(|(region, values)| {
+                assert!(values.len() == 1, "{} values?!", values.len());
+                (region, values[0])
+            })
+            .collect();
+
+        // Compute the default on the unrounded deltas
+        let default_value = deltas
+            .iter()
+            .filter_map(|(region, value)| {
+                let scaler = region.scalar_at(&var_model.default).into_inner();
+                (scaler != 0.0).then_some(*value * scaler)
+            })
+            .sum::<f64>()
+            .ot_round();
+
+        // Produce the desired delta type
+        let mut fears_deltas = Vec::with_capacity(deltas.len());
+        for (region, value) in deltas.iter().filter(|(r, _)| !r.is_default()) {
+            fears_deltas.push((
+                region.to_write_fonts_variation_region(&self.axes),
+                value.ot_round(),
+            ));
+        }
+
+        Ok((default_value, fears_deltas))
     }
 
     fn resolve_glyphs_number_value(
