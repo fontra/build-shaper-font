@@ -9,7 +9,7 @@ use fea_rs::{
 };
 use fontdrasil::{
     coords::{NormalizedLocation, UserCoord},
-    types::Axis,
+    types::{Axes, Axis},
 };
 use write_fonts::{
     tables::{
@@ -61,33 +61,35 @@ impl AxisInfo {
 }
 
 struct SimpleVariationInfo {
-    axes: Vec<Axis>,
+    axes: Axes,
 }
 
 impl SimpleVariationInfo {
     fn new(axis_infos: Vec<AxisInfo>) -> Self {
         Self {
-            axes: axis_infos
-                .into_iter()
-                .map(|a| {
-                    let tag = Tag::from_str(&a.axis_tag).unwrap();
-                    let min = UserCoord::new(a.min_value);
-                    let default = UserCoord::new(a.default_value);
-                    let max = UserCoord::new(a.max_value);
-                    Axis {
-                        name: a.axis_tag,
-                        tag,
-                        min,
-                        default,
-                        max,
-                        hidden: false,
-                        converter: fontdrasil::coords::CoordConverter::default_normalization(
-                            min, default, max,
-                        ),
-                        localized_names: Default::default(),
-                    }
-                })
-                .collect(),
+            axes: Axes::new(
+                axis_infos
+                    .into_iter()
+                    .map(|a| {
+                        let tag = Tag::from_str(&a.axis_tag).unwrap();
+                        let min = UserCoord::new(a.min_value);
+                        let default = UserCoord::new(a.default_value);
+                        let max = UserCoord::new(a.max_value);
+                        Axis {
+                            name: a.axis_tag,
+                            tag,
+                            min,
+                            default,
+                            max,
+                            hidden: false,
+                            converter: fontdrasil::coords::CoordConverter::default_normalization(
+                                min, default, max,
+                            ),
+                            localized_names: Default::default(),
+                        }
+                    })
+                    .collect(),
+            ),
         }
     }
 }
@@ -248,7 +250,7 @@ pub fn build_shaper_font(
                     .checked_add(1)
                     .unwrap();
 
-                for axis in &variation_info.axes {
+                for axis in variation_info.axes.iter() {
                     name_table.name_record.push(NameRecord::new(
                         3,
                         1,
