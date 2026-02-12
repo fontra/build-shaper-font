@@ -5,6 +5,7 @@
 	},
 	"devDependencies": {
 		"chai": "^4.3.7",
-		"mocha": "^10.2.0"
+		"mocha": "^10.2.0",
+		"harfbuzzjs": "^0.8.0"
 	}
 }
