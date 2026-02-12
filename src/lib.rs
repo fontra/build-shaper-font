@@ -1,6 +1,12 @@
 use wasm_bindgen::prelude::*;
 
-use std::{collections::HashMap, fmt::Display, path::Path, str::FromStr};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    path::Path,
+    str::FromStr,
+};
 
 use fea_rs::{
     compile::{validate, CompilationCtx, NopFeatureProvider, VariationInfo},
@@ -23,6 +29,14 @@ use write_fonts::{
 };
 
 const MAX_DIAGNOSTICS: usize = 100;
+
+#[wasm_bindgen]
+extern "C" {
+    // Use `js_namespace` here to bind `console.log(..)` instead of just
+    // `log(..)`
+    #[wasm_bindgen(js_namespace = console, js_name = log)]
+    fn console_log(s: &str);
+}
 
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Clone)]
@@ -64,35 +78,44 @@ impl AxisInfo {
 
 struct SimpleVariationInfo {
     axes: Axes,
+    model: VariationModel,
 }
 
 impl SimpleVariationInfo {
     fn new(axis_infos: Vec<AxisInfo>) -> Self {
-        Self {
-            axes: Axes::new(
-                axis_infos
-                    .into_iter()
-                    .map(|a| {
-                        let tag = Tag::from_str(&a.axis_tag).unwrap();
-                        let min = UserCoord::new(a.min_value);
-                        let default = UserCoord::new(a.default_value);
-                        let max = UserCoord::new(a.max_value);
-                        Axis {
-                            name: a.axis_tag,
-                            tag,
-                            min,
-                            default,
-                            max,
-                            hidden: false,
-                            converter: fontdrasil::coords::CoordConverter::default_normalization(
-                                min, default, max,
-                            ),
-                            localized_names: Default::default(),
-                        }
-                    })
-                    .collect(),
-            ),
-        }
+        let axes = Axes::new(
+            axis_infos
+                .into_iter()
+                .map(|a| {
+                    let tag = Tag::from_str(&a.axis_tag).unwrap();
+                    let min = UserCoord::new(a.min_value);
+                    let default = UserCoord::new(a.default_value);
+                    let max = UserCoord::new(a.max_value);
+                    Axis {
+                        name: a.axis_tag,
+                        tag,
+                        min,
+                        default,
+                        max,
+                        hidden: false,
+                        converter: fontdrasil::coords::CoordConverter::default_normalization(
+                            min, default, max,
+                        ),
+                        localized_names: Default::default(),
+                    }
+                })
+                .collect(),
+        );
+
+        let mut location = NormalizedLocation::new();
+        axes.iter().for_each(|axis| {
+            location.insert(axis.tag, axis.default.to_normalized(&axis.converter));
+        });
+
+        let locations = vec![location].into_iter().collect();
+        let model = VariationModel::new(locations, axes.axis_order());
+
+        Self { axes, model }
     }
 }
 
@@ -136,8 +159,19 @@ impl VariationInfo for SimpleVariationInfo {
             .map(|(pos, value)| (pos.clone(), vec![*value as f64]))
             .collect();
 
-        let locations = point_seqs.keys().into_iter().cloned().collect();
-        let var_model = VariationModel::new(locations, self.axes.axis_order());
+        let locations: HashSet<_> = point_seqs.keys().into_iter().collect();
+        let global_locations: HashSet<_> = self.model.locations().collect();
+
+        // Try to reuse the global model, or make a new sub-model only with the locations we
+        // are asked for so we can support sparseness
+        let var_model: Cow<'_, VariationModel> = if locations == global_locations {
+            Cow::Borrowed(&self.model)
+        } else {
+            Cow::Owned(VariationModel::new(
+                locations.into_iter().cloned().collect(),
+                self.axes.axis_order(),
+            ))
+        };
 
         // Only 1 value per region for our input
         let deltas: Vec<_> = var_model
