@@ -22,8 +22,10 @@ jobs:
         run: cargo install wasm-pack
       - name: Build
         run: wasm-pack build --target nodejs
+      - name: NPM install
+        run: npm install
       - name: Run tests
-        run: wasm-pack test --node
+        run: npm test
 
   formatting:
     name: Formatting

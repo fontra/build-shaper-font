@@ -30,16 +30,9 @@ wasm-pack build --target web
 
 ## Test
 
-### With Node.js:
-
 ```
-wasm-pack test --node
-```
-
-### With the browser:
-
-```
-WASM_BINDGEN_USE_BROWSER=1 wasm-pack test --firefox --headless
+npm install
+npm test
 ```
 
 ## Publish to NPM
