@@ -38,3 +38,14 @@ jobs:
           components: rustfmt
       - uses: actions-rust-lang/rustfmt@v1
         name: Rustfmt Check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy
+      - name: Clippy Check
+        run: cargo clippy -- -D warnings
