@@ -1,8 +1,7 @@
 use wasm_bindgen::prelude::*;
 
 use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap},
     fmt::Display,
     path::Path,
     str::FromStr,
@@ -78,7 +77,7 @@ impl AxisInfo {
 
 struct SimpleVariationInfo {
     axes: Axes,
-    model: VariationModel,
+    model_cache: std::cell::RefCell<HashMap<BTreeSet<NormalizedLocation>, VariationModel>>,
 }
 
 impl SimpleVariationInfo {
@@ -107,15 +106,10 @@ impl SimpleVariationInfo {
                 .collect(),
         );
 
-        let mut location = NormalizedLocation::new();
-        axes.iter().for_each(|axis| {
-            location.insert(axis.tag, axis.default.to_normalized(&axis.converter));
-        });
-
-        let locations = vec![location].into_iter().collect();
-        let model = VariationModel::new(locations, axes.axis_order());
-
-        Self { axes, model }
+        Self {
+            axes,
+            model_cache: Default::default(),
+        }
     }
 }
 
@@ -159,19 +153,13 @@ impl VariationInfo for SimpleVariationInfo {
             .map(|(pos, value)| (pos.clone(), vec![*value as f64]))
             .collect();
 
-        let locations: HashSet<_> = point_seqs.keys().collect();
-        let global_locations: HashSet<_> = self.model.locations().collect();
+        let locations: BTreeSet<_> = point_seqs.keys().cloned().collect();
 
-        // Try to reuse the global model, or make a new sub-model only with the locations we
-        // are asked for so we can support sparseness
-        let var_model: Cow<'_, VariationModel> = if locations == global_locations {
-            Cow::Borrowed(&self.model)
-        } else {
-            Cow::Owned(VariationModel::new(
-                locations.into_iter().cloned().collect(),
-                self.axes.axis_order(),
-            ))
-        };
+        // Reuse or create a model for the locations we are asked for
+        let mut model_cache = self.model_cache.borrow_mut();
+        let var_model = model_cache.entry(locations.clone()).or_insert_with(|| {
+            VariationModel::new(locations.iter().cloned().collect(), self.axes.axis_order())
+        });
 
         // Only 1 value per region for our input
         let deltas: Vec<_> = var_model
