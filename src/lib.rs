@@ -159,7 +159,7 @@ impl VariationInfo for SimpleVariationInfo {
             .map(|(pos, value)| (pos.clone(), vec![*value as f64]))
             .collect();
 
-        let locations: HashSet<_> = point_seqs.keys().into_iter().collect();
+        let locations: HashSet<_> = point_seqs.keys().collect();
         let global_locations: HashSet<_> = self.model.locations().collect();
 
         // Try to reuse the global model, or make a new sub-model only with the locations we
@@ -270,11 +270,7 @@ pub fn build_shaper_font(
         }
     }
 
-    let variation_info = if let Some(axes) = axes {
-        Some(SimpleVariationInfo::new(axes))
-    } else {
-        None
-    };
+    let variation_info = axes.map(SimpleVariationInfo::new);
 
     let diagnostics = validate(&tree, &glyph_map, variation_info.as_ref());
     if !diagnostics.is_empty() {
