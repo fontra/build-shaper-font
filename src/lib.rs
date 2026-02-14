@@ -225,6 +225,8 @@ pub struct CompilationResult {
     #[wasm_bindgen(js_name = "insertMarkers")]
     pub insert_markers: Option<Vec<InsertMarker>>,
     pub messages: Vec<Message>,
+    #[wasm_bindgen(js_name = "formattedMessages")]
+    pub formatted_messages: String,
 }
 
 impl CompilationResult {
@@ -245,6 +247,8 @@ impl CompilationResult {
                 },
             });
         }
+
+        self.formatted_messages += &diagnostics.display().to_string();
     }
 }
 

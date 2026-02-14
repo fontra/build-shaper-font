@@ -28,23 +28,35 @@ feature aalt {
     feature liga;
 } aalt;
 `;
-    const { fontData, messages } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
+    const { fontData, messages, formattedMessages } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
     expect(fontData).to.not.equal(undefined);
     expect(messages[0].level).to.equal('warning');
     expect(messages[0].text).to.equal('Referenced feature not found.');
     expect(featureSource.substring(messages[0].span.start, messages[0].span.end)).to.equal('liga');
+    expect(formattedMessages).to.equal(`warning: Referenced feature not found.
+in features.fea at 4:12
+  | 
+4 |     feature liga;
+  |             ^^^^
+`);
   });
 
   it('Build font with feature data, return errors', function () {
     const unitsPerEm = 2000;
     const glyphOrder = ['.notdef'];
     const featureSource = "languagesystem DFLT dflt";
-    const { fontData, messages } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
+    const { fontData, messages, formattedMessages } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
     expect(fontData).to.equal(undefined);
     expect(messages[0].level).to.equal('error');
     expect(messages[0].text).to.equal("Expected ';'");
     expect(messages[0].span.start).to.equal(featureSource.length);
     expect(messages[0].span.end).to.equal(featureSource.length + 1);
+    expect(formattedMessages).to.equal(`error: Expected ';'
+in features.fea at 1:24
+  | 
+1 | languagesystem DFLT dflt
+  |                         ^
+`);
   });
 
   it('Build font with feature data, return warnings with correct UTF-16 indices', function () {
