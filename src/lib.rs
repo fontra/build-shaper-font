@@ -17,6 +17,7 @@ use fontdrasil::{
     types::{Axes, Axis},
     variations::VariationModel,
 };
+use serde::{Deserialize, Serialize};
 use write_fonts::{
     tables::{
         fvar::{AxisInstanceArrays, Fvar, VariationAxisRecord},
@@ -37,42 +38,20 @@ extern "C" {
     fn console_log(s: &str);
 }
 
-#[wasm_bindgen(getter_with_clone)]
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InsertMarker {
     pub tag: String,
-    #[wasm_bindgen(js_name = "lookupId")]
     pub lookup_id: usize,
 }
 
-#[wasm_bindgen(getter_with_clone)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AxisInfo {
-    #[wasm_bindgen(js_name = "axisTag")]
     pub axis_tag: String,
-    #[wasm_bindgen(js_name = "minValue")]
     pub min_value: f64,
-    #[wasm_bindgen(js_name = "defaultValue")]
     pub default_value: f64,
-    #[wasm_bindgen(js_name = "maxValue")]
     pub max_value: f64,
-}
-
-#[wasm_bindgen]
-impl AxisInfo {
-    #[wasm_bindgen(constructor)]
-    pub fn new(
-        #[wasm_bindgen(js_name = "axisTag")] axis_tag: String,
-        #[wasm_bindgen(js_name = "minValue")] min_value: f64,
-        #[wasm_bindgen(js_name = "defaultValue")] default_value: f64,
-        #[wasm_bindgen(js_name = "maxValue")] max_value: f64,
-    ) -> Self {
-        AxisInfo {
-            axis_tag,
-            min_value,
-            default_value,
-            max_value,
-        }
-    }
 }
 
 struct SimpleVariationInfo {
@@ -202,30 +181,26 @@ impl VariationInfo for SimpleVariationInfo {
     }
 }
 
-#[wasm_bindgen(getter_with_clone)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize)]
 pub struct Span {
     pub start: usize,
     pub end: usize,
 }
 
-#[wasm_bindgen(getter_with_clone)]
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Message {
     pub level: String,
     pub text: String,
     pub span: Span,
 }
 
-#[wasm_bindgen(getter_with_clone)]
-#[derive(Default)]
+#[derive(Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CompilationResult {
-    #[wasm_bindgen(js_name = "fontData")]
+    #[serde(with = "serde_bytes")]
     pub font_data: Option<Vec<u8>>,
-    #[wasm_bindgen(js_name = "insertMarkers")]
     pub insert_markers: Option<Vec<InsertMarker>>,
     pub messages: Vec<Message>,
-    #[wasm_bindgen(js_name = "formattedMessages")]
     pub formatted_messages: String,
 }
 
@@ -249,6 +224,10 @@ impl CompilationResult {
         }
 
         self.formatted_messages += &diagnostics.display().to_string();
+    }
+
+    fn into_js(self) -> JsValue {
+        serde_wasm_bindgen::to_value(&self).unwrap()
     }
 }
 
@@ -274,9 +253,11 @@ pub fn build_shaper_font(
     #[wasm_bindgen(js_name = "unitsPerEm")] units_per_em: u16,
     #[wasm_bindgen(js_name = "glyphOrder")] glyph_order: Vec<String>,
     #[wasm_bindgen(js_name = "featureSource")] feature_source: String,
-    axes: Option<Vec<AxisInfo>>,
-) -> Result<CompilationResult, JsError> {
+    axes: JsValue,
+) -> Result<JsValue, JsError> {
     set_panic_hook();
+
+    let axes: Option<Vec<AxisInfo>> = serde_wasm_bindgen::from_value(axes)?;
 
     let glyph_map: GlyphMap = glyph_order.iter().map(|s| s.as_str()).collect();
 
@@ -302,7 +283,7 @@ pub fn build_shaper_font(
     let mut res = CompilationResult::default();
     res.add_diagnostics(&diagnostics, &tree);
     if diagnostics.has_errors() {
-        return Ok(res);
+        return Ok(res.into_js());
     }
 
     let variation_info = axes.map(SimpleVariationInfo::new);
@@ -310,7 +291,7 @@ pub fn build_shaper_font(
     let diagnostics = validate(&tree, &glyph_map, variation_info.as_ref());
     res.add_diagnostics(&diagnostics, &tree);
     if diagnostics.has_errors() {
-        return Ok(res);
+        return Ok(res.into_js());
     }
 
     let mut ctx = CompilationCtx::new(
@@ -387,12 +368,12 @@ pub fn build_shaper_font(
 
             res.font_data = Some(builder.build());
             res.insert_markers = Some(insert_markers);
-            Ok(res)
+            Ok(res.into_js())
         }
         Err(errors) => {
             let diagnostics = DiagnosticSet::new(errors, &tree, MAX_DIAGNOSTICS);
             res.add_diagnostics(&diagnostics, &tree);
-            Ok(res)
+            Ok(res.into_js())
         }
     }
 }
