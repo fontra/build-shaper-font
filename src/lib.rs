@@ -9,7 +9,7 @@ use std::{
 
 use fea_rs::{
     compile::{validate, CompilationCtx, NopFeatureProvider, VariationInfo},
-    parse::{parse_root, SourceLoadError},
+    parse::{parse_root, ParseTree, SourceLoadError},
     DiagnosticSet, GlyphMap,
 };
 use fontdrasil::{
@@ -203,12 +203,55 @@ impl VariationInfo for SimpleVariationInfo {
 }
 
 #[wasm_bindgen(getter_with_clone)]
+#[derive(Clone, Copy)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+}
+
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Clone)]
+pub struct Message {
+    pub level: String,
+    pub text: String,
+    pub span: Span,
+}
+
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Default)]
 pub struct CompilationResult {
     #[wasm_bindgen(js_name = "fontData")]
     pub font_data: Option<Vec<u8>>,
     #[wasm_bindgen(js_name = "insertMarkers")]
     pub insert_markers: Option<Vec<InsertMarker>>,
-    pub messages: String,
+    pub messages: Vec<Message>,
+}
+
+impl CompilationResult {
+    fn add_diagnostics(&mut self, diagnostics: &DiagnosticSet, tree: &ParseTree) {
+        for diagnostic in diagnostics.diagnostics() {
+            let source = tree
+                .get_source(diagnostic.message.file)
+                .map(|s| s.text())
+                .unwrap_or("");
+            let span = diagnostic.span();
+
+            self.messages.push(Message {
+                level: format!("{:?}", diagnostic.level).to_lowercase(),
+                text: diagnostic.message.text.clone(),
+                span: Span {
+                    start: to_utf16_offset(source, span.start),
+                    end: to_utf16_offset(source, span.end),
+                },
+            });
+        }
+    }
+}
+
+fn to_utf16_offset(s: &str, byte_offset: usize) -> usize {
+    s.get(..byte_offset)
+        .map(|s| s.chars().map(|c| c.len_utf16()).sum())
+        .unwrap_or(byte_offset)
 }
 
 fn set_panic_hook() {
@@ -233,10 +276,8 @@ pub fn build_shaper_font(
 
     let glyph_map: GlyphMap = glyph_order.iter().map(|s| s.as_str()).collect();
 
-    let mut messages = Vec::new();
-
     const SRC_NAME: &str = "features.fea";
-    let (tree, diagnostics) = parse_root(
+    let (tree, diagnostics) = match parse_root(
         SRC_NAME.into(),
         Some(&glyph_map),
         Box::new(move |s: &Path| {
@@ -249,23 +290,23 @@ pub fn build_shaper_font(
                 ))
             }
         }),
-    )?;
+    ) {
+        Ok(res) => res,
+        Err(e) => return Err(JsError::new(&e.to_string())),
+    };
 
-    if !diagnostics.is_empty() {
-        messages.push(diagnostics.display().to_string());
-        if diagnostics.has_errors() {
-            return Err(JsError::new(&messages.join("\n")));
-        }
+    let mut res = CompilationResult::default();
+    res.add_diagnostics(&diagnostics, &tree);
+    if diagnostics.has_errors() {
+        return Ok(res);
     }
 
     let variation_info = axes.map(SimpleVariationInfo::new);
 
     let diagnostics = validate(&tree, &glyph_map, variation_info.as_ref());
-    if !diagnostics.is_empty() {
-        messages.push(diagnostics.display().to_string());
-        if diagnostics.has_errors() {
-            return Err(JsError::new(&messages.join("\n")));
-        }
+    res.add_diagnostics(&diagnostics, &tree);
+    if diagnostics.has_errors() {
+        return Ok(res);
     }
 
     let mut ctx = CompilationCtx::new(
@@ -289,10 +330,8 @@ pub fn build_shaper_font(
 
     match ctx.build() {
         Ok((mut compilation, warnings)) => {
-            if !warnings.is_empty() {
-                let diagnostics = DiagnosticSet::new(warnings, &tree, MAX_DIAGNOSTICS);
-                messages.push(diagnostics.display().to_string());
-            }
+            let diagnostics = DiagnosticSet::new(warnings, &tree, MAX_DIAGNOSTICS);
+            res.add_diagnostics(&diagnostics, &tree);
 
             let mut head_table = compilation.head.take().unwrap_or_default();
             head_table.units_per_em = units_per_em;
@@ -342,19 +381,14 @@ pub fn build_shaper_font(
                 builder.add_table(&fvar_table)?;
             }
 
-            let font_data = builder.build();
-
-            Ok(CompilationResult {
-                font_data: Some(font_data),
-                insert_markers: Some(insert_markers),
-                messages: messages.join("\n"),
-            })
+            res.font_data = Some(builder.build());
+            res.insert_markers = Some(insert_markers);
+            Ok(res)
         }
         Err(errors) => {
             let diagnostics = DiagnosticSet::new(errors, &tree, MAX_DIAGNOSTICS);
-            messages.push(diagnostics.display().to_string());
-
-            Err(JsError::new(&messages.join("\n")))
+            res.add_diagnostics(&diagnostics, &tree);
+            Ok(res)
         }
     }
 }
