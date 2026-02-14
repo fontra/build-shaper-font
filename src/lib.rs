@@ -181,17 +181,11 @@ impl VariationInfo for SimpleVariationInfo {
     }
 }
 
-#[derive(Clone, Copy, Serialize)]
-pub struct Span {
-    pub start: usize,
-    pub end: usize,
-}
-
 #[derive(Clone, Serialize)]
 pub struct Message {
     pub level: String,
     pub text: String,
-    pub span: Span,
+    pub span: (usize, usize),
 }
 
 #[derive(Default, Serialize)]
@@ -216,10 +210,10 @@ impl CompilationResult {
             self.messages.push(Message {
                 level: format!("{:?}", diagnostic.level).to_lowercase(),
                 text: diagnostic.message.text.clone(),
-                span: Span {
-                    start: to_utf16_offset(source, span.start),
-                    end: to_utf16_offset(source, span.end),
-                },
+                span: (
+                    to_utf16_offset(source, span.start),
+                    to_utf16_offset(source, span.end),
+                ),
             });
         }
 
