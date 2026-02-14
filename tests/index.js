@@ -107,7 +107,7 @@ feature mkmk {
     const unitsPerEm = 1000;
     const glyphOrder = ['.notdef', 'A', 'V'];
     const featureSource = '';
-    const axes = [{ axisTag: 'wght', minValue: 100, defaultValue: 400, maxValue: 900 }];
+    const axes = [{ tag: 'wght', minValue: 100, defaultValue: 400, maxValue: 900 }];
     const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, axes);
     expect(fontData).to.not.equal(null);
 
@@ -129,7 +129,7 @@ feature kern {
     pos A V (wght=400:-50 wght=900:0 wght=100:-100);
 } kern;
  `;
-    const axes = [{ axisTag: 'wght', minValue: 100, defaultValue: 400, maxValue: 900 }];
+    const axes = [{ tag: 'wght', minValue: 100, defaultValue: 400, maxValue: 900 }];
     const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, axes);
     expect(fontData).to.not.equal(null);
 

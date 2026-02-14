@@ -48,7 +48,7 @@ pub struct InsertMarker {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AxisInfo {
-    pub axis_tag: String,
+    pub tag: String,
     pub min_value: f64,
     pub default_value: f64,
     pub max_value: f64,
@@ -65,12 +65,12 @@ impl SimpleVariationInfo {
             axis_infos
                 .into_iter()
                 .map(|a| {
-                    let tag = Tag::from_str(&a.axis_tag).unwrap();
+                    let tag = Tag::from_str(&a.tag).unwrap();
                     let min = UserCoord::new(a.min_value);
                     let default = UserCoord::new(a.default_value);
                     let max = UserCoord::new(a.max_value);
                     Axis {
-                        name: a.axis_tag,
+                        name: a.tag,
                         tag,
                         min,
                         default,
