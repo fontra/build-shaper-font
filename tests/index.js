@@ -76,7 +76,7 @@ feature aalt {
     expect(featureSource.substring(...messages[0].span)).to.equal('liga');
   });
 
-  it('Build font with feature data with insert markers', function () {
+  it('Build font with with insert markers', function () {
     const unitsPerEm = 2000;
     const glyphOrder = ['.notdef', 'A', 'V'];
     const featureSource = `
@@ -100,6 +100,36 @@ feature mkmk {
     expect(insertMarkers.length).to.equal(2);
     expect([insertMarkers[0].tag, insertMarkers[0].lookupId]).to.deep.equal(['kern', 1]);
     expect([insertMarkers[1].tag, insertMarkers[1].lookupId]).to.deep.equal(['mark', 1]);
+  });
+
+  it('Build font with with insert markers sorted by priority', function () {
+    const unitsPerEm = 2000;
+    const glyphOrder = ['.notdef', 'A', 'V'];
+    const featureSource = `
+languagesystem DFLT dflt;
+
+feature kern {
+    # Automatic Code
+} kern;
+
+feature curs {
+    # Automatic Code
+} curs;
+
+feature mkmk {
+    # Automatic Code
+} mkmk;
+
+feature mark {
+    # Automatic Code
+} mark;
+`;
+    const { insertMarkers } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
+    expect(insertMarkers.length).to.equal(4);
+    expect(insertMarkers[0]).to.deep.equal({ tag: 'kern', lookupId: 0 });
+    expect(insertMarkers[1]).to.deep.equal({ tag: 'curs', lookupId: 0 });
+    expect(insertMarkers[2]).to.deep.equal({ tag: 'mkmk', lookupId: 0 });
+    expect(insertMarkers[3]).to.deep.equal({ tag: 'mark', lookupId: 0 });
   });
 
   it('Build font with variations', async function () {

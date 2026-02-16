@@ -297,15 +297,15 @@ pub fn build_shaper_font(
     );
     ctx.compile(&tree.typed_root());
 
-    let mut insert_markers: Vec<_> = ctx
-        .insert_markers
-        .iter()
+    let mut insert_markers: Vec<_> = ctx.insert_markers.iter().collect();
+    insert_markers.sort_by(|(_, point_a), (_, point_b)| point_a.priority.cmp(&point_b.priority));
+    let insert_markers: Vec<InsertMarker> = insert_markers
+        .into_iter()
         .map(|(tag, point)| InsertMarker {
             tag: tag.to_string(),
             lookup_id: point.lookup_id.to_raw(),
         })
         .collect();
-    insert_markers.sort_by(|a, b| a.tag.cmp(&b.tag));
 
     match ctx.build() {
         Ok((mut compilation, warnings)) => {
