@@ -16,9 +16,9 @@ feature kern {
     const { fontData, insertMarkers, messages } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
     expect(fontData).to.not.equal(null);
     expect(insertMarkers).to.deep.equal([
-      { tag: 'curs', lookupId: 1 },
-      { tag: 'mark', lookupId: 1 },
-      { tag: 'mkmk', lookupId: 1 },
+      { tag: 'curs', lookupId: undefined },
+      { tag: 'mark', lookupId: undefined },
+      { tag: 'mkmk', lookupId: undefined },
     ]);
     expect(messages.length).to.equal(0);
   });
@@ -44,10 +44,10 @@ in features.fea at 4:12
   |             ^^^^
 `);
     expect(insertMarkers).to.deep.equal([
-      { tag: 'curs', lookupId: 0 },
-      { tag: 'kern', lookupId: 0 },
-      { tag: 'mark', lookupId: 0 },
-      { tag: 'mkmk', lookupId: 0 },
+      { tag: 'curs', lookupId: undefined },
+      { tag: 'kern', lookupId: undefined },
+      { tag: 'mark', lookupId: undefined },
+      { tag: 'mkmk', lookupId: undefined },
     ]);
   });
 
@@ -110,7 +110,7 @@ feature mkmk {
     expect(insertMarkers).to.deep.equal([
       { tag: 'kern', lookupId: 1 },
       { tag: 'mark', lookupId: 1 },
-      { tag: 'curs', lookupId: 2 },
+      { tag: 'curs', lookupId: undefined },
     ]);
   });
 

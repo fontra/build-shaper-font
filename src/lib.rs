@@ -42,7 +42,7 @@ extern "C" {
 #[serde(rename_all = "camelCase")]
 pub struct InsertMarker {
     pub tag: String,
-    pub lookup_id: usize,
+    pub lookup_id: Option<usize>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -304,7 +304,7 @@ pub fn build_shaper_font(
         .into_iter()
         .map(|(tag, point)| InsertMarker {
             tag: tag.to_string(),
-            lookup_id: point.lookup_id.to_raw(),
+            lookup_id: Some(point.lookup_id.to_raw()),
         })
         .collect();
 
@@ -358,15 +358,9 @@ pub fn build_shaper_font(
                 compilation.name = Some(name_table);
             }
 
-            let next_lookup_id = compilation
-                .gpos
-                .as_ref()
-                .map(|gpos| gpos.lookup_list.as_ref().lookups.len())
-                .unwrap_or(0);
-
             // Add default insert markers.
             // If both a feature and corresponding insert marker are missing,
-            // add an insert marker at the end of GPOS table for that feature
+            // add an insert marker with None lookup_id for that feature,
             // in the same order the feature writer would have inserted code
             // for that feature.
             for tag_str in ["curs", "kern", "mark", "mkmk"] {
@@ -387,7 +381,7 @@ pub fn build_shaper_font(
                 if !has_marker && !has_feature {
                     insert_markers.push(InsertMarker {
                         tag: tag_str.to_string(),
-                        lookup_id: next_lookup_id,
+                        lookup_id: None,
                     });
                 }
             }
