@@ -300,7 +300,7 @@ pub fn build_shaper_font(
 
     let mut insert_markers: Vec<_> = ctx.insert_markers.iter().collect();
     insert_markers.sort_by(|(_, a), (_, b)| a.priority.cmp(&b.priority));
-    let insert_markers: Vec<InsertMarker> = insert_markers
+    let mut insert_markers: Vec<InsertMarker> = insert_markers
         .into_iter()
         .map(|(tag, point)| InsertMarker {
             tag: tag.to_string(),
@@ -356,6 +356,40 @@ pub fn build_shaper_font(
                 name_table.name_record.sort();
 
                 compilation.name = Some(name_table);
+            }
+
+            let next_lookup_id = compilation
+                .gpos
+                .as_ref()
+                .map(|gpos| gpos.lookup_list.as_ref().lookups.len())
+                .unwrap_or(0);
+
+            // Add default insert markers.
+            // If both a feature and corresponding insert marker are missing,
+            // add an insert marker at the end of GPOS table for that feature
+            // in the same order the feature writer would have inserted code
+            // for that feature.
+            for tag_str in ["curs", "kern", "mark", "mkmk"] {
+                let tag = Tag::from_str(tag_str).unwrap();
+                let has_marker = insert_markers.iter().any(|m| m.tag == tag_str);
+                let has_feature = compilation
+                    .gpos
+                    .as_ref()
+                    .map(|gpos| {
+                        gpos.feature_list
+                            .as_ref()
+                            .feature_records
+                            .iter()
+                            .any(|rec| rec.feature_tag == tag)
+                    })
+                    .unwrap_or(false);
+
+                if !has_marker && !has_feature {
+                    insert_markers.push(InsertMarker {
+                        tag: tag_str.to_string(),
+                        lookup_id: next_lookup_id,
+                    });
+                }
             }
 
             let mut builder = compilation
