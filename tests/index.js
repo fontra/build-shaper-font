@@ -32,7 +32,7 @@ feature aalt {
     feature liga;
 } aalt;
 `;
-    const { fontData, messages, formattedMessages } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
+    const { fontData, messages, formattedMessages, insertMarkers } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
     expect(fontData).to.not.equal(undefined);
     expect(messages[0].level).to.equal('warning');
     expect(messages[0].text).to.equal('Referenced feature not found.');
@@ -43,6 +43,12 @@ in features.fea at 4:12
 4 |     feature liga;
   |             ^^^^
 `);
+    expect(insertMarkers).to.deep.equal([
+      { tag: 'curs', lookupId: 0 },
+      { tag: 'kern', lookupId: 0 },
+      { tag: 'mark', lookupId: 0 },
+      { tag: 'mkmk', lookupId: 0 },
+    ]);
   });
 
   it('Build font with feature data, return errors', function () {
