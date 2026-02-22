@@ -251,7 +251,8 @@ pub fn build_shaper_font(
 ) -> Result<JsValue, JsError> {
     set_panic_hook();
 
-    let axes: Option<Vec<AxisInfo>> = serde_wasm_bindgen::from_value(axes)?;
+    let axes: Option<Vec<AxisInfo>> =
+        serde_wasm_bindgen::from_value(axes).map_err(|e| JsError::new(&e.to_string()))?;
 
     let glyph_map: GlyphMap = glyph_order.iter().map(|s| s.as_str()).collect();
 
@@ -327,7 +328,7 @@ pub fn build_shaper_font(
                     .unwrap_or(0.into())
                     .max(NameId::LAST_RESERVED_NAME_ID)
                     .checked_add(1)
-                    .unwrap();
+                    .ok_or_else(|| JsError::new("name_id overflow"))?;
 
                 for axis in variation_info.axes.iter() {
                     name_table.name_record.push(NameRecord::new(
@@ -347,7 +348,9 @@ pub fn build_shaper_font(
                         ..Default::default()
                     });
 
-                    name_id = name_id.checked_add(1).unwrap();
+                    name_id = name_id
+                        .checked_add(1)
+                        .ok_or_else(|| JsError::new("name_id overflow"))?;
                 }
 
                 name_table.name_record.sort();
@@ -355,11 +358,15 @@ pub fn build_shaper_font(
                 compilation.name = Some(name_table);
             }
 
-            let mut builder = compilation.to_font_builder()?;
+            let mut builder = compilation
+                .to_font_builder()
+                .map_err(|e| JsError::new(&e.to_string()))?;
 
             if !fvar_axes.is_empty() {
                 let fvar_table = Fvar::new(AxisInstanceArrays::new(fvar_axes, Vec::new()));
-                builder.add_table(&fvar_table)?;
+                builder
+                    .add_table(&fvar_table)
+                    .map_err(|e| JsError::new(&e.to_string()))?;
             }
 
             res.font_data = Some(builder.build());
