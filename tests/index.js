@@ -256,4 +256,18 @@ feature kern {
     expect(positions[0].x_advance).to.equal(50);
     expect(positions[1].x_advance).to.equal(100);
   });
+
+  it('Build font with variations and name table', function () {
+    const unitsPerEm = 1000;
+    const glyphOrder = ['.notdef', 'A', 'V'];
+    const featureSource = `
+table name {
+    nameid 1 "Family";
+    nameid 1 3 1 0x0809 "Family UK";
+} name;
+`;
+    const axes = [{ tag: 'wght', minValue: 100, defaultValue: 400, maxValue: 900 }];
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, axes);
+    expect(fontData).to.not.equal(null);
+  });
 });

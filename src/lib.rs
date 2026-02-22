@@ -350,6 +350,8 @@ pub fn build_shaper_font(
                     name_id = name_id.checked_add(1).unwrap();
                 }
 
+                name_table.name_record.sort();
+
                 compilation.name = Some(name_table);
             }
 
