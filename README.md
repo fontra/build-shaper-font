@@ -1,3 +1,6 @@
+[![NPM Version](https://img.shields.io/npm/v/build-shaper-font.svg)](https://npmjs.org/package/build-shaper-font)
+[![Rust](https://github.com/fontra/build-shaper-font/actions/workflows/rust.yml/badge.svg)](https://github.com/fontra/build-shaper-font/actions/workflows/rust.yml)
+
 # build-shaper-font
 
 A minimal font compiler to produce "shaper fonts", minimal fonts to feed to HarfBuzz
