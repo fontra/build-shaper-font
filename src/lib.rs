@@ -309,6 +309,27 @@ pub fn build_shaper_font(
         })
         .collect();
 
+    // Add default insert markers.
+    // If both a feature and corresponding insert marker are missing,
+    // add an insert marker with None lookup_id for that feature,
+    // in the same order the feature writer would have inserted code
+    // for that feature.
+    for tag in ["curs", "kern", "mark", "mkmk"] {
+        let has_marker = insert_markers.iter().any(|m| m.tag == tag);
+        let has_feature = tree.typed_root().statements().any(|statement| {
+            fea_rs::typed::Feature::cast(statement)
+                .map(|f| f.tag().text() == tag)
+                .unwrap_or(false)
+        });
+
+        if !has_marker && !has_feature {
+            insert_markers.push(InsertMarker {
+                tag: tag.to_string(),
+                lookup_id: None,
+            });
+        }
+    }
+
     match ctx.build() {
         Ok((mut compilation, warnings)) => {
             let diagnostics = DiagnosticSet::new(warnings, &tree, MAX_DIAGNOSTICS);
@@ -357,27 +378,6 @@ pub fn build_shaper_font(
                 name_table.name_record.sort();
 
                 compilation.name = Some(name_table);
-            }
-
-            // Add default insert markers.
-            // If both a feature and corresponding insert marker are missing,
-            // add an insert marker with None lookup_id for that feature,
-            // in the same order the feature writer would have inserted code
-            // for that feature.
-            for tag in ["curs", "kern", "mark", "mkmk"] {
-                let has_marker = insert_markers.iter().any(|m| m.tag == tag);
-                let has_feature = tree.typed_root().statements().any(|statement| {
-                    fea_rs::typed::Feature::cast(statement)
-                        .map(|f| f.tag().text() == tag)
-                        .unwrap_or(false)
-                });
-
-                if !has_marker && !has_feature {
-                    insert_markers.push(InsertMarker {
-                        tag: tag.to_string(),
-                        lookup_id: None,
-                    });
-                }
             }
 
             let mut builder = compilation
