@@ -21,7 +21,11 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build
-        run: wasm-pack build --target nodejs
+        run: wasm-pack build
+      - uses: actions/setup-node@v6
+        name: Setup Node
+        with:
+          node-version: latest
       - name: NPM install
         run: npm install
       - name: Run tests

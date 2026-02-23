@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: '24.x'
+          node-version: latest
 
       - name: Set up Rust for caching
         uses: actions-rust-lang/setup-rust-toolchain@v1
