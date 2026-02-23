@@ -12,11 +12,13 @@ languagesystem DFLT dflt;
 feature kern {
     pos A V -50;
 } kern;
+
+feature curs {
+} curs;
  `;
     const { fontData, insertMarkers, messages } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
     expect(fontData).to.not.equal(null);
     expect(insertMarkers).to.deep.equal([
-      { tag: 'curs', lookupId: undefined },
       { tag: 'mark', lookupId: undefined },
       { tag: 'mkmk', lookupId: undefined },
     ]);

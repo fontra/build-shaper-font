@@ -10,6 +10,7 @@ use std::{
 use fea_rs::{
     compile::{validate, CompilationCtx, NopFeatureProvider, VariationInfo},
     parse::{parse_root, ParseTree, SourceLoadError},
+    typed::AstNode,
     DiagnosticSet, GlyphMap,
 };
 use fontdrasil::{
@@ -363,24 +364,17 @@ pub fn build_shaper_font(
             // add an insert marker with None lookup_id for that feature,
             // in the same order the feature writer would have inserted code
             // for that feature.
-            for tag_str in ["curs", "kern", "mark", "mkmk"] {
-                let tag = Tag::from_str(tag_str).unwrap();
-                let has_marker = insert_markers.iter().any(|m| m.tag == tag_str);
-                let has_feature = compilation
-                    .gpos
-                    .as_ref()
-                    .map(|gpos| {
-                        gpos.feature_list
-                            .as_ref()
-                            .feature_records
-                            .iter()
-                            .any(|rec| rec.feature_tag == tag)
-                    })
-                    .unwrap_or(false);
+            for tag in ["curs", "kern", "mark", "mkmk"] {
+                let has_marker = insert_markers.iter().any(|m| m.tag == tag);
+                let has_feature = tree.typed_root().statements().any(|statement| {
+                    fea_rs::typed::Feature::cast(statement)
+                        .map(|f| f.tag().text() == tag)
+                        .unwrap_or(false)
+                });
 
                 if !has_marker && !has_feature {
                     insert_markers.push(InsertMarker {
-                        tag: tag_str.to_string(),
+                        tag: tag.to_string(),
                         lookup_id: None,
                     });
                 }
