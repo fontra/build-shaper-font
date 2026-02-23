@@ -27,7 +27,7 @@ jobs:
         run: cargo install wasm-pack
 
       - name: Build
-        run: wasm-pack build --target nodejs
+        run: wasm-pack build
 
       - name: Publish to npm
         run: |
