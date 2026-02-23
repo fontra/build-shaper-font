@@ -7,39 +7,35 @@ A minimal font compiler to produce "shaper fonts", minimal fonts to feed to Harf
 
 ## Build
 
-### Prerequisites
-
-- Rust
-- wasm-pack
-
-E.g. with homebrew:
+You need Rust and wasm-pack installed. For example, Rust can be installed with homebrew:
 
 ```
 brew install rust
-brew install wasm-pack
 ```
 
-### For Node.js:
+Then install wasm-pack:
 
 ```
-wasm-pack build --target nodejs
+cargo install wasm-pack
 ```
 
-### For the browser:
+Finally, build the project:
 
 ```
-wasm-pack build --target web
+wasm-pack build
 ```
 
 ## Test
 
+You need nodejs and npm installed. For example, they can be installed with homebrew:
+
+```
+brew install nodejs
+```
+
+Then use npm to test the project:
+
 ```
 npm install
 npm test
-```
-
-## Publish to NPM
-
-```
-wasm-pack publish
 ```
