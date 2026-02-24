@@ -285,4 +285,143 @@ table name {
     const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, axes);
     expect(fontData).to.not.equal(null);
   });
+
+  it('Build font with glyph classes', async function () {
+    const unitsPerEm = 1000;
+    const glyphOrder = ['.notdef', 'baseGlyph', 'ligatureGlyph', 'markGlyph', 'componentGlyph'];
+    const glyphClasses = {
+      base: ['baseGlyph'],
+      ligature: ['ligatureGlyph'],
+      mark: ['markGlyph'],
+      component: ['componentGlyph']
+    };
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, '', undefined, glyphClasses);
+    expect(fontData).to.not.equal(null);
+
+    let hb = await harfbuzz;
+    const blob = hb.createBlob(fontData);
+    const face = hb.createFace(blob);
+
+    expect(face.getGlyphClass(0)).to.equal('UNCLASSIFIED');
+    expect(face.getGlyphClass(1)).to.equal('BASE_GLYPH');
+    expect(face.getGlyphClass(2)).to.equal('LIGATURE');
+    expect(face.getGlyphClass(3)).to.equal('MARK');
+    expect(face.getGlyphClass(4)).to.equal('COMPONENT');
+  });
+
+  it('Build font with partial glyph classes', async function () {
+    const unitsPerEm = 1000;
+    const glyphOrder = ['.notdef', 'baseGlyph', 'ligatureGlyph', 'markGlyph', 'componentGlyph'];
+    const glyphClasses = {
+      mark: ['markGlyph'],
+    };
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, '', undefined, glyphClasses);
+    expect(fontData).to.not.equal(null);
+
+    let hb = await harfbuzz;
+    const blob = hb.createBlob(fontData);
+    const face = hb.createFace(blob);
+
+    expect(face.getGlyphClass(0)).to.equal('UNCLASSIFIED');
+    expect(face.getGlyphClass(1)).to.equal('UNCLASSIFIED');
+    expect(face.getGlyphClass(2)).to.equal('UNCLASSIFIED');
+    expect(face.getGlyphClass(3)).to.equal('MARK');
+    expect(face.getGlyphClass(4)).to.equal('UNCLASSIFIED');
+  });
+
+  it('Do not override glyph if present in features', async function () {
+    const unitsPerEm = 1000;
+    const glyphOrder = ['.notdef', 'baseGlyph', 'ligatureGlyph', 'markGlyph', 'componentGlyph'];
+    const featureSource = `
+table GDEF {
+  GlyphClassDef [baseGlyph], [ligatureGlyph], [markGlyph], [componentGlyph];
+} GDEF;
+`;
+    const glyphClasses = {
+      base: ['componentGlyph'],
+      ligature: ['markGlyph'],
+      mark: ['ligatureGlyph'],
+      component: ['baseGlyph']
+    };
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, undefined, glyphClasses);
+    expect(fontData).to.not.equal(null);
+
+    let hb = await harfbuzz;
+    const blob = hb.createBlob(fontData);
+    const face = hb.createFace(blob);
+
+    expect(face.getGlyphClass(0)).to.equal('UNCLASSIFIED');
+    expect(face.getGlyphClass(1)).to.equal('BASE_GLYPH');
+    expect(face.getGlyphClass(2)).to.equal('LIGATURE');
+    expect(face.getGlyphClass(3)).to.equal('MARK');
+    expect(face.getGlyphClass(4)).to.equal('COMPONENT');
+  });
+
+  it('Build font with glyph classes and variable GPOS', async function () {
+    const unitsPerEm = 1000;
+    const glyphOrder = ['.notdef', 'A', 'V'];
+    const featureSource = `
+languagesystem DFLT dflt;
+
+feature kern {
+    pos A V (wght=400:-50 wght=900:0 wght=100:-100);
+} kern;
+ `;
+    const axes = [{ tag: 'wght', minValue: 100, defaultValue: 400, maxValue: 900 }];
+    const glyphClasses = {
+      base: ['A', 'V'],
+    };
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, axes, glyphClasses);
+    expect(fontData).to.not.equal(null);
+
+    let hb = await harfbuzz;
+    const blob = hb.createBlob(fontData);
+    const face = hb.createFace(blob);
+    const font = hb.createFont(face);
+
+    let fontFuncs = hb.createFontFuncs();
+    fontFuncs.setNominalGlyphFunc((_, codepoint) => {
+      const ch = String.fromCodePoint(codepoint);
+      if (glyphOrder.includes(ch)) {
+        return glyphOrder.indexOf(ch);
+      }
+      return 0;
+    });
+
+    fontFuncs.setGlyphHAdvanceFunc(() => {
+      return 100;
+    });
+
+    font.setFuncs(fontFuncs);
+
+    const buffer = hb.createBuffer();
+    buffer.addText('AV');
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    const positions = buffer.getGlyphPositions();
+    expect(positions[0].x_advance).to.equal(50);
+    expect(positions[1].x_advance).to.equal(100);
+
+    font.setVariations({ 'wght': 100 });
+    buffer.clearContents();
+    buffer.addText('AV');
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    const positions2 = buffer.getGlyphPositions();
+    expect(positions2[0].x_advance).to.equal(0);
+    expect(positions2[1].x_advance).to.equal(100);
+
+    font.setVariations({ 'wght': 900 });
+    buffer.clearContents();
+    buffer.addText('AV');
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    const positions3 = buffer.getGlyphPositions();
+    expect(positions3[0].x_advance).to.equal(100);
+    expect(positions3[1].x_advance).to.equal(100);
+
+    expect(face.getGlyphClass(0)).to.equal('UNCLASSIFIED');
+    expect(face.getGlyphClass(1)).to.equal('BASE_GLYPH');
+    expect(face.getGlyphClass(2)).to.equal('BASE_GLYPH');
+  });
 });

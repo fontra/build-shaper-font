@@ -22,10 +22,12 @@ use serde::{Deserialize, Serialize};
 use write_fonts::{
     tables::{
         fvar::{AxisInstanceArrays, Fvar, VariationAxisRecord},
+        gdef::{Gdef, GlyphClassDef},
+        layout::ClassDef,
         name::NameRecord,
         variations::VariationRegion,
     },
-    types::{NameId, Tag},
+    types::{GlyphId16, NameId, Tag},
     OtRound,
 };
 
@@ -53,6 +55,14 @@ pub struct AxisInfo {
     pub min_value: f64,
     pub default_value: f64,
     pub max_value: f64,
+}
+
+#[derive(Clone, Deserialize)]
+pub struct GlyphClasses {
+    pub base: Option<Vec<String>>,
+    pub mark: Option<Vec<String>>,
+    pub ligature: Option<Vec<String>>,
+    pub component: Option<Vec<String>>,
 }
 
 struct SimpleVariationInfo {
@@ -249,11 +259,15 @@ pub fn build_shaper_font(
     #[wasm_bindgen(js_name = "glyphOrder")] glyph_order: Vec<String>,
     #[wasm_bindgen(js_name = "featureSource")] feature_source: String,
     axes: JsValue,
+    #[wasm_bindgen(js_name = "glyphClasses")] glyph_classes: JsValue,
 ) -> Result<JsValue, JsError> {
     set_panic_hook();
 
     let axes: Option<Vec<AxisInfo>> =
         serde_wasm_bindgen::from_value(axes).map_err(|e| JsError::new(&e.to_string()))?;
+
+    let gdef_classes: Option<GlyphClasses> =
+        serde_wasm_bindgen::from_value(glyph_classes).map_err(|e| JsError::new(&e.to_string()))?;
 
     let glyph_map: GlyphMap = glyph_order.iter().map(|s| s.as_str()).collect();
 
@@ -378,6 +392,42 @@ pub fn build_shaper_font(
                 name_table.name_record.sort();
 
                 compilation.name = Some(name_table);
+            }
+
+            if let Some(glyph_classes) = gdef_classes {
+                let has_feature_gdef_classes = compilation
+                    .gdef
+                    .as_ref()
+                    .map(|gdef| !gdef.glyph_class_def.is_none())
+                    .unwrap_or(false);
+
+                if !has_feature_gdef_classes {
+                    let mut classes = Vec::new();
+
+                    let mut add_class = |names: &Option<Vec<String>>, class_val: GlyphClassDef| {
+                        if let Some(names) = names {
+                            for name in names {
+                                if let Some(gid) = glyph_map.get(name.as_str()) {
+                                    classes.push((GlyphId16::new(gid.to_u16()), class_val as u16));
+                                }
+                            }
+                        }
+                    };
+
+                    add_class(&glyph_classes.base, GlyphClassDef::Base);
+                    add_class(&glyph_classes.ligature, GlyphClassDef::Ligature);
+                    add_class(&glyph_classes.mark, GlyphClassDef::Mark);
+                    add_class(&glyph_classes.component, GlyphClassDef::Component);
+
+                    if !classes.is_empty() {
+                        let class_def = ClassDef::from_iter(classes);
+                        if let Some(gdef) = compilation.gdef.as_mut() {
+                            gdef.glyph_class_def = Some(class_def).into();
+                        } else {
+                            compilation.gdef = Some(Gdef::new(Some(class_def), None, None, None));
+                        }
+                    }
+                }
             }
 
             let mut builder = compilation
