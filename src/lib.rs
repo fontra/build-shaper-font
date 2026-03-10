@@ -8,7 +8,7 @@ use std::{
 };
 
 use fea_rs::{
-    compile::{validate, CompilationCtx, NopFeatureProvider, VariationInfo},
+    compile::{self, validate, NopFeatureProvider, Opts, VariationInfo},
     parse::{parse_root, ParseTree, SourceLoadError},
     typed::AstNode,
     DiagnosticSet, GlyphMap,
@@ -211,7 +211,7 @@ pub struct CompilationResult {
 
 impl CompilationResult {
     fn add_diagnostics(&mut self, diagnostics: &DiagnosticSet, tree: &ParseTree) {
-        for diagnostic in diagnostics.diagnostics() {
+        for diagnostic in diagnostics.diagnostics().iter().take(MAX_DIAGNOSTICS) {
             let source = tree
                 .get_source(diagnostic.message.file)
                 .map(|s| s.text())
@@ -228,6 +228,11 @@ impl CompilationResult {
             });
         }
 
+        // display() renders source-context-annotated diagnostics (file paths,
+        // line numbers, caret markers). It uses an internal cap from the
+        // DiagnosticSet; compile::compile() sets that to usize::MAX, so in
+        // theory a pathological FEA file could produce a large string. In
+        // practice this is rare and preserving the rich output is worth it.
         self.formatted_messages += &diagnostics.display().to_string();
     }
 
@@ -304,50 +309,47 @@ pub fn build_shaper_font(
         return Ok(res.into_js());
     }
 
-    let mut ctx = CompilationCtx::new(
+    match compile::compile(
+        &tree,
         &glyph_map,
-        tree.source_map(),
         variation_info.as_ref(),
         None::<&NopFeatureProvider>,
-        Default::default(),
-    );
-    ctx.compile(&tree.typed_root());
-
-    let mut insert_markers: Vec<_> = ctx.insert_markers.iter().collect();
-    insert_markers.sort_by(|(_, a), (_, b)| a.priority.cmp(&b.priority));
-    let mut insert_markers: Vec<InsertMarker> = insert_markers
-        .into_iter()
-        .map(|(tag, point)| InsertMarker {
-            tag: tag.to_string(),
-            lookup_id: Some(point.lookup_id.to_raw()),
-        })
-        .collect();
-
-    // Add default insert markers.
-    // If both a feature and corresponding insert marker are missing,
-    // add an insert marker with None lookup_id for that feature,
-    // in the same order the feature writer would have inserted code
-    // for that feature.
-    for tag in ["curs", "kern", "mark", "mkmk"] {
-        let has_marker = insert_markers.iter().any(|m| m.tag == tag);
-        let has_feature = tree.typed_root().statements().any(|statement| {
-            fea_rs::typed::Feature::cast(statement)
-                .map(|f| f.tag().text() == tag)
-                .unwrap_or(false)
-        });
-
-        if !has_marker && !has_feature {
-            insert_markers.push(InsertMarker {
-                tag: tag.to_string(),
-                lookup_id: None,
-            });
-        }
-    }
-
-    match ctx.build() {
-        Ok((mut compilation, warnings)) => {
-            let diagnostics = DiagnosticSet::new(warnings, &tree, MAX_DIAGNOSTICS);
+        Opts::default(),
+    ) {
+        Ok((mut compilation, diagnostics)) => {
             res.add_diagnostics(&diagnostics, &tree);
+
+            // Build insert markers from the Compilation result
+            let mut insert_markers: Vec<_> = compilation.insert_markers.iter().collect();
+            insert_markers.sort_by(|(_, a), (_, b)| a.priority.cmp(&b.priority));
+            let mut insert_markers: Vec<InsertMarker> = insert_markers
+                .into_iter()
+                .map(|(tag, point)| InsertMarker {
+                    tag: tag.to_string(),
+                    lookup_id: Some(point.lookup_id.to_raw()),
+                })
+                .collect();
+
+            // Add default insert markers.
+            // If both a feature and corresponding insert marker are missing,
+            // add an insert marker with None lookup_id for that feature,
+            // in the same order the feature writer would have inserted code
+            // for that feature.
+            for tag in ["curs", "kern", "mark", "mkmk"] {
+                let has_marker = insert_markers.iter().any(|m| m.tag == tag);
+                let has_feature = tree.typed_root().statements().any(|statement| {
+                    fea_rs::typed::Feature::cast(statement)
+                        .map(|f| f.tag().text() == tag)
+                        .unwrap_or(false)
+                });
+
+                if !has_marker && !has_feature {
+                    insert_markers.push(InsertMarker {
+                        tag: tag.to_string(),
+                        lookup_id: None,
+                    });
+                }
+            }
 
             let mut head_table = compilation.head.take().unwrap_or_default();
             head_table.units_per_em = units_per_em;
@@ -445,8 +447,7 @@ pub fn build_shaper_font(
             res.insert_markers = Some(insert_markers);
             Ok(res.into_js())
         }
-        Err(errors) => {
-            let diagnostics = DiagnosticSet::new(errors, &tree, MAX_DIAGNOSTICS);
+        Err(diagnostics) => {
             res.add_diagnostics(&diagnostics, &tree);
             Ok(res.into_js())
         }
