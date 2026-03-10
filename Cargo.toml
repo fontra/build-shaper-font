@@ -15,8 +15,8 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 wasm-bindgen = "0.2.84"
-fea-rs = { git = "https://github.com/khaledhosny/fontc", branch = "insert-markers" }
-fontdrasil = { git = "https://github.com/khaledhosny/fontc", branch = "insert-markers" }
+fea-rs = { git = "https://github.com/googlefonts/fontc", branch = "expose-insert-markers" }
+fontdrasil = { git = "https://github.com/googlefonts/fontc", branch = "expose-insert-markers" }
 write-fonts = "0.44.1"
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
