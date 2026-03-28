@@ -1,9 +1,7 @@
 use wasm_bindgen::prelude::*;
 
 use std::{
-    cell::RefCell,
-    collections::{BTreeSet, HashMap, HashSet},
-    fmt::Display,
+    collections::{HashMap, HashSet},
     path::Path,
     str::FromStr,
 };
@@ -11,16 +9,15 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use fea_rs::{
-    compile::{self, validate, Opts, VariationInfo},
+    compile::{self, validate, Opts},
     parse::{parse_root, ParseTree, SourceLoadError},
     typed::{AstNode, Feature},
     DiagnosticSet, GlyphMap,
 };
-use fontbe::features::feature_variations::FeatureVariationsProvider;
+use fontbe::features::{feature_variations::FeatureVariationsProvider, FeaVariationInfo};
 use fontdrasil::{
-    coords::{CoordConverter, DesignCoord, NormalizedLocation, UserCoord},
-    types::{Axes, Axis, GlyphName},
-    variations::VariationModel,
+    coords::{CoordConverter, DesignCoord, UserCoord},
+    types::{Axis, GlyphName},
 };
 use fontir::ir::{Condition, GlyphOrder, Rule, StaticMetadata, Substitution, VariableFeature};
 use write_fonts::{
@@ -29,10 +26,8 @@ use write_fonts::{
         gdef::{Gdef, GlyphClassDef},
         layout::ClassDef,
         name::NameRecord,
-        variations::VariationRegion,
     },
     types::{GlyphId16, NameId, Tag},
-    OtRound,
 };
 
 const MAX_DIAGNOSTICS: usize = 100;
@@ -108,133 +103,6 @@ fn to_variable_feature(inputs: Vec<FeatureVariationInput>) -> VariableFeature {
     }
 
     VariableFeature { features, rules }
-}
-
-struct SimpleVariationInfo {
-    axes: Axes,
-    model_cache: RefCell<HashMap<BTreeSet<NormalizedLocation>, VariationModel>>,
-}
-
-impl SimpleVariationInfo {
-    fn new(axis_infos: Vec<AxisInfo>) -> Self {
-        let axes = Axes::new(
-            axis_infos
-                .into_iter()
-                .map(|a| {
-                    let tag = Tag::from_str(&a.tag).unwrap();
-                    let min = UserCoord::new(a.min_value);
-                    let default = UserCoord::new(a.default_value);
-                    let max = UserCoord::new(a.max_value);
-                    Axis {
-                        name: a.tag,
-                        tag,
-                        min,
-                        default,
-                        max,
-                        hidden: false,
-                        converter: fontdrasil::coords::CoordConverter::default_normalization(
-                            min, default, max,
-                        ),
-                        localized_names: Default::default(),
-                    }
-                })
-                .collect(),
-        );
-
-        Self {
-            axes,
-            model_cache: Default::default(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct VariationError;
-
-impl std::error::Error for VariationError {}
-
-impl Display for VariationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("variation error")
-    }
-}
-
-impl VariationInfo for SimpleVariationInfo {
-    type Error = VariationError;
-
-    fn axis_count(&self) -> u16 {
-        self.axes.len() as u16
-    }
-
-    fn axis(&self, axis_tag: Tag) -> Option<(usize, &Axis)> {
-        self.axes.iter().enumerate().find_map(|(i, axis)| {
-            if axis_tag == axis.tag {
-                Some((i, axis))
-            } else {
-                None
-            }
-        })
-    }
-
-    // Adapted from
-    // https://github.com/googlefonts/fontc/blob/982b5b5acc2749b7e8e4ed7bba1ed655a5b7981d/fontbe/src/features.rs#L317
-    fn resolve_variable_metric(
-        &self,
-        values: &HashMap<NormalizedLocation, i16>,
-    ) -> Result<(i16, Vec<(VariationRegion, i16)>), Self::Error> {
-        // Compute deltas using f64 as 1d point and delta, then ship them home as i16
-        let point_seqs: HashMap<_, _> = values
-            .iter()
-            .map(|(pos, value)| (pos.clone(), vec![*value as f64]))
-            .collect();
-
-        let locations: BTreeSet<_> = point_seqs.keys().cloned().collect();
-
-        // Reuse or create a model for the locations we are asked for
-        let mut model_cache = self.model_cache.borrow_mut();
-        let var_model = model_cache.entry(locations.clone()).or_insert_with(|| {
-            VariationModel::new(locations.iter().cloned().collect(), self.axes.axis_order())
-        });
-
-        // Only 1 value per region for our input
-        let deltas: Vec<_> = var_model
-            .deltas(&point_seqs)
-            .map_err(|_| VariationError)?
-            .into_iter()
-            .map(|(region, values)| {
-                assert!(values.len() == 1, "{} values?!", values.len());
-                (region, values[0])
-            })
-            .collect();
-
-        // Compute the default on the unrounded deltas
-        let default_value = deltas
-            .iter()
-            .filter_map(|(region, value)| {
-                let scaler = region.scalar_at(&var_model.default).into_inner();
-                (scaler != 0.0).then_some(*value * scaler)
-            })
-            .sum::<f64>()
-            .ot_round();
-
-        // Produce the desired delta type
-        let mut fears_deltas = Vec::with_capacity(deltas.len());
-        for (region, value) in deltas.iter().filter(|(r, _)| !r.is_default()) {
-            fears_deltas.push((
-                region.to_write_fonts_variation_region(&self.axes),
-                value.ot_round(),
-            ));
-        }
-
-        Ok((default_value, fears_deltas))
-    }
-
-    fn resolve_glyphs_number_value(
-        &self,
-        _: &str,
-    ) -> Result<HashMap<NormalizedLocation, f64>, Self::Error> {
-        unimplemented!("Glyphs number values are not supported")
-    }
 }
 
 #[derive(Clone, Serialize)]
@@ -351,7 +219,7 @@ pub fn build_shaper_font(
         return Ok(res.into_js());
     }
 
-    let static_metadata = axes.clone().map(|axis_infos| {
+    let static_metadata = axes.map(|axis_infos| {
         let axes: Vec<Axis> = axis_infos
             .into_iter()
             .map(|a| {
@@ -388,7 +256,7 @@ pub fn build_shaper_font(
         )
         .expect("failed to build static metadata")
     });
-    let variation_info = axes.map(SimpleVariationInfo::new);
+    let variation_info = static_metadata.as_ref().map(FeaVariationInfo::new);
 
     let diagnostics = validate(&tree, &glyph_map, variation_info.as_ref());
     res.add_diagnostics(&diagnostics, &tree);
@@ -456,7 +324,7 @@ pub fn build_shaper_font(
             compilation.head = Some(head_table);
 
             let mut fvar_axes = Vec::new();
-            if let Some(variation_info) = variation_info {
+            if let Some(sm) = static_metadata.as_ref() {
                 let mut name_table = compilation.name.take().unwrap_or_default();
                 let mut name_id = name_table
                     .name_record
@@ -468,7 +336,7 @@ pub fn build_shaper_font(
                     .checked_add(1)
                     .ok_or_else(|| JsError::new("name_id overflow"))?;
 
-                for axis in variation_info.axes.iter() {
+                for axis in sm.axes.iter() {
                     name_table.name_record.push(NameRecord::new(
                         3,
                         1,
