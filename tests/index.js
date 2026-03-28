@@ -424,4 +424,67 @@ feature kern {
     expect(face.getGlyphClass(1)).to.equal('BASE_GLYPH');
     expect(face.getGlyphClass(2)).to.equal('BASE_GLYPH');
   });
+
+  it('Build font with feature variations', async function () {
+    const unitsPerEm = 1000;
+    const glyphOrder = ['.notdef', 'cent', 'cent.rvrn', 'dollar', 'dollar.rvrn'];
+    const axes = [
+      { tag: 'wght', minValue: 100, defaultValue: 400, maxValue: 900 },
+      { tag: 'wdth', minValue: 100, defaultValue: 400, maxValue: 900 }
+    ];
+    const featureSource = 'languagesystem DFLT dflt;';
+    const glyphClasses = {};
+    const featureVariations = [
+      {
+        featureTags: ["rvrn"],
+        rules: [
+          [[{ "wdth": [500, 900] }], { "cent": "cent.rvrn" }],
+          [[{ "wght": [500, 900] }], { "dollar": "dollar.rvrn" }],
+        ]
+      }
+    ];
+
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, axes, glyphClasses, featureVariations);
+    expect(fontData).to.not.equal(null);
+
+    let hb = await harfbuzz;
+    const blob = hb.createBlob(fontData);
+    const face = hb.createFace(blob);
+    const font = hb.createFont(face);
+
+    let fontFuncs = hb.createFontFuncs();
+    fontFuncs.setNominalGlyphFunc((_, codepoint) => {
+      if (codepoint === 0x00A2) return glyphOrder.indexOf('cent');
+      if (codepoint === 0x0024) return glyphOrder.indexOf('dollar');
+      return 0;
+    });
+
+    font.setFuncs(fontFuncs);
+
+    const buffer = hb.createBuffer();
+    buffer.addText('¢$');
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    let infos = buffer.getGlyphInfos();
+    expect(infos[0].codepoint).to.equal(1); // 'cent'
+    expect(infos[1].codepoint).to.equal(3); // 'dollar'
+
+    font.setVariations({ 'wdth': 600, 'wght': 400 });
+    buffer.clearContents();
+    buffer.addText('¢$');
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    infos = buffer.getGlyphInfos();
+    expect(infos[0].codepoint).to.equal(2); // 'cent.rvrn'
+    expect(infos[1].codepoint).to.equal(3); // 'dollar'
+
+    font.setVariations({ 'wdth': 400, 'wght': 600 });
+    buffer.clearContents();
+    buffer.addText('¢$');
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    infos = buffer.getGlyphInfos();
+    expect(infos[0].codepoint).to.equal(1); // 'cent'
+    expect(infos[1].codepoint).to.equal(4); // 'dollar.rvrn'
+  });
 });
