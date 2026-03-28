@@ -1,24 +1,28 @@
 use wasm_bindgen::prelude::*;
 
 use std::{
-    collections::{BTreeSet, HashMap},
+    cell::RefCell,
+    collections::{BTreeSet, HashMap, HashSet},
     fmt::Display,
     path::Path,
     str::FromStr,
 };
 
+use serde::{Deserialize, Serialize};
+
 use fea_rs::{
-    compile::{self, validate, NopFeatureProvider, Opts, VariationInfo},
+    compile::{self, validate, Opts, VariationInfo},
     parse::{parse_root, ParseTree, SourceLoadError},
-    typed::AstNode,
+    typed::{AstNode, Feature},
     DiagnosticSet, GlyphMap,
 };
+use fontbe::features::feature_variations::FeatureVariationsProvider;
 use fontdrasil::{
-    coords::{NormalizedLocation, UserCoord},
-    types::{Axes, Axis},
+    coords::{CoordConverter, DesignCoord, NormalizedLocation, UserCoord},
+    types::{Axes, Axis, GlyphName},
     variations::VariationModel,
 };
-use serde::{Deserialize, Serialize};
+use fontir::ir::{Condition, GlyphOrder, Rule, StaticMetadata, Substitution, VariableFeature};
 use write_fonts::{
     tables::{
         fvar::{AxisInstanceArrays, Fvar, VariationAxisRecord},
@@ -65,9 +69,50 @@ pub struct GlyphClasses {
     pub component: Option<Vec<String>>,
 }
 
+type ConditionsInput = Vec<HashMap<String, (f64, f64)>>;
+type SubstitutionsInput = HashMap<String, String>;
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FeatureVariationInput {
+    feature_tags: Vec<String>,
+    rules: Vec<(ConditionsInput, SubstitutionsInput)>,
+}
+
+fn to_variable_feature(inputs: Vec<FeatureVariationInput>) -> VariableFeature {
+    let mut features = Vec::new();
+    let mut rules = Vec::new();
+
+    for input in inputs {
+        features.extend(input.feature_tags.iter().map(|t| Tag::from_str(t).unwrap()));
+        for (conditions, substitutions) in input.rules {
+            rules.push(Rule {
+                conditions: vec![conditions
+                    .into_iter()
+                    .flat_map(|m| m.into_iter())
+                    .map(|(axis_tag, (min, max))| Condition {
+                        axis: Tag::from_str(&axis_tag).unwrap(),
+                        min: Some(DesignCoord::new(min)),
+                        max: Some(DesignCoord::new(max)),
+                    })
+                    .collect()],
+                substitutions: substitutions
+                    .into_iter()
+                    .map(|(from, to)| Substitution {
+                        replace: GlyphName::from(from),
+                        with: GlyphName::from(to),
+                    })
+                    .collect(),
+            });
+        }
+    }
+
+    VariableFeature { features, rules }
+}
+
 struct SimpleVariationInfo {
     axes: Axes,
-    model_cache: std::cell::RefCell<HashMap<BTreeSet<NormalizedLocation>, VariationModel>>,
+    model_cache: RefCell<HashMap<BTreeSet<NormalizedLocation>, VariationModel>>,
 }
 
 impl SimpleVariationInfo {
@@ -265,6 +310,7 @@ pub fn build_shaper_font(
     #[wasm_bindgen(js_name = "featureSource")] feature_source: String,
     axes: JsValue,
     #[wasm_bindgen(js_name = "glyphClasses")] glyph_classes: JsValue,
+    #[wasm_bindgen(js_name = "featureVariations")] feature_variations: JsValue,
 ) -> Result<JsValue, JsError> {
     set_panic_hook();
 
@@ -273,6 +319,10 @@ pub fn build_shaper_font(
 
     let gdef_classes: Option<GlyphClasses> =
         serde_wasm_bindgen::from_value(glyph_classes).map_err(|e| JsError::new(&e.to_string()))?;
+
+    let feat_vars: Option<Vec<FeatureVariationInput>> =
+        serde_wasm_bindgen::from_value(feature_variations)
+            .map_err(|e| JsError::new(&e.to_string()))?;
 
     let glyph_map: GlyphMap = glyph_order.iter().map(|s| s.as_str()).collect();
 
@@ -301,6 +351,43 @@ pub fn build_shaper_font(
         return Ok(res.into_js());
     }
 
+    let static_metadata = axes.clone().map(|axis_infos| {
+        let axes: Vec<Axis> = axis_infos
+            .into_iter()
+            .map(|a| {
+                let tag = Tag::from_str(&a.tag).unwrap();
+                let min = UserCoord::new(a.min_value);
+                let default = UserCoord::new(a.default_value);
+                let max = UserCoord::new(a.max_value);
+                Axis {
+                    name: a.tag,
+                    tag,
+                    min,
+                    default,
+                    max,
+                    hidden: false,
+                    converter: CoordConverter::unmapped(min, default, max),
+                    localized_names: Default::default(),
+                }
+            })
+            .collect();
+        let default_location = axes
+            .iter()
+            .map(|a| (a.tag, a.default.to_normalized(&a.converter)))
+            .collect();
+        StaticMetadata::new(
+            units_per_em,
+            Default::default(),
+            axes,
+            Vec::new(),
+            HashSet::from([default_location]),
+            None,
+            0.0,
+            None,
+            false,
+        )
+        .expect("failed to build static metadata")
+    });
     let variation_info = axes.map(SimpleVariationInfo::new);
 
     let diagnostics = validate(&tree, &glyph_map, variation_info.as_ref());
@@ -309,11 +396,24 @@ pub fn build_shaper_font(
         return Ok(res.into_js());
     }
 
+    let feat_vars_provider = feat_vars.filter(|v| !v.is_empty()).map(|v| {
+        let sm = static_metadata
+            .as_ref()
+            .expect("axes required for feature variations");
+        let var_feat = to_variable_feature(v);
+        let ir_glyph_order: GlyphOrder = glyph_order
+            .iter()
+            .map(|s| GlyphName::from(s.as_str()))
+            .collect();
+        FeatureVariationsProvider::new(&var_feat, sm, &ir_glyph_order)
+            .expect("failed to build feature variations")
+    });
+
     match compile::compile(
         &tree,
         &glyph_map,
         variation_info.as_ref(),
-        None::<&NopFeatureProvider>,
+        feat_vars_provider.as_ref(),
         Opts::default(),
     ) {
         Ok((mut compilation, diagnostics)) => {
@@ -338,7 +438,7 @@ pub fn build_shaper_font(
             for tag in ["curs", "kern", "mark", "mkmk"] {
                 let has_marker = insert_markers.iter().any(|m| m.tag == tag);
                 let has_feature = tree.typed_root().statements().any(|statement| {
-                    fea_rs::typed::Feature::cast(statement)
+                    Feature::cast(statement)
                         .map(|f| f.tag().text() == tag)
                         .unwrap_or(false)
                 });
