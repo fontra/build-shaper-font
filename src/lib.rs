@@ -64,7 +64,7 @@ pub struct GlyphClasses {
     pub component: Option<Vec<String>>,
 }
 
-type ConditionsInput = Vec<HashMap<String, (f64, f64)>>;
+type ConditionsInput = Vec<HashMap<String, (Option<f64>, Option<f64>)>>;
 type SubstitutionsInput = HashMap<String, String>;
 
 #[derive(Clone, Deserialize)]
@@ -87,8 +87,8 @@ fn to_variable_feature(inputs: Vec<FeatureVariationInput>) -> VariableFeature {
                     .flat_map(|m| m.into_iter())
                     .map(|(axis_tag, (min, max))| Condition {
                         axis: Tag::from_str(&axis_tag).unwrap(),
-                        min: Some(DesignCoord::new(min)),
-                        max: Some(DesignCoord::new(max)),
+                        min: min.map(DesignCoord::new),
+                        max: max.map(DesignCoord::new),
                     })
                     .collect()],
                 substitutions: substitutions

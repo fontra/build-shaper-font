@@ -427,7 +427,7 @@ feature kern {
 
   it('Build font with feature variations', async function () {
     const unitsPerEm = 1000;
-    const glyphOrder = ['.notdef', 'cent', 'cent.rvrn', 'dollar', 'dollar.rvrn'];
+    const glyphOrder = ['.notdef', 'cent', 'cent.alt1', 'cent.alt2', 'dollar', 'dollar.alt1', 'dollar.alt2'];
     const axes = [
       { tag: 'wght', minValue: 100, defaultValue: 400, maxValue: 900 },
       { tag: 'wdth', minValue: 100, defaultValue: 400, maxValue: 900 }
@@ -438,8 +438,10 @@ feature kern {
       {
         featureTags: ["rvrn"],
         rules: [
-          [[{ "wdth": [500, 900] }], { "cent": "cent.rvrn" }],
-          [[{ "wght": [500, 900] }], { "dollar": "dollar.rvrn" }],
+          [[{ "wght": [null, 600] }], { "dollar": "dollar.alt1" }],
+          [[{ "wght": [600, 900] }], { "dollar": "dollar.alt2" }],
+          [[{ "wdth": [500, 700] }], { "cent": "cent.alt1" }],
+          [[{ "wdth": [700, null] }], { "cent": "cent.alt2" }],
         ]
       }
     ];
@@ -460,31 +462,51 @@ feature kern {
     });
 
     font.setFuncs(fontFuncs);
+    const text = '¢$';
 
+    // wght=400, wdth=400
     const buffer = hb.createBuffer();
-    buffer.addText('¢$');
+    buffer.addText(text);
     buffer.guessSegmentProperties();
     hb.shape(font, buffer);
     let infos = buffer.getGlyphInfos();
     expect(infos[0].codepoint).to.equal(1); // 'cent'
-    expect(infos[1].codepoint).to.equal(3); // 'dollar'
+    expect(infos[1].codepoint).to.equal(5); // 'dollar.alt1'
 
     font.setVariations({ 'wdth': 600, 'wght': 400 });
     buffer.clearContents();
-    buffer.addText('¢$');
+    buffer.addText(text);
     buffer.guessSegmentProperties();
     hb.shape(font, buffer);
     infos = buffer.getGlyphInfos();
-    expect(infos[0].codepoint).to.equal(2); // 'cent.rvrn'
-    expect(infos[1].codepoint).to.equal(3); // 'dollar'
+    expect(infos[0].codepoint).to.equal(2); // 'cent.alt1'
+    expect(infos[1].codepoint).to.equal(5); // 'dollar.alt1'
 
-    font.setVariations({ 'wdth': 400, 'wght': 600 });
+    font.setVariations({ 'wdth': 400, 'wght': 700 });
     buffer.clearContents();
-    buffer.addText('¢$');
+    buffer.addText(text);
     buffer.guessSegmentProperties();
     hb.shape(font, buffer);
     infos = buffer.getGlyphInfos();
     expect(infos[0].codepoint).to.equal(1); // 'cent'
-    expect(infos[1].codepoint).to.equal(4); // 'dollar.rvrn'
+    expect(infos[1].codepoint).to.equal(6); // 'dollar.alt2'
+
+    font.setVariations({ 'wdth': 800, 'wght': 400 });
+    buffer.clearContents();
+    buffer.addText(text);
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    infos = buffer.getGlyphInfos();
+    expect(infos[0].codepoint).to.equal(3); // 'cent.alt2'
+    expect(infos[1].codepoint).to.equal(5); // 'dollar.alt1'
+
+    font.setVariations({ 'wdth': 800, 'wght': 700 });
+    buffer.clearContents();
+    buffer.addText(text);
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    infos = buffer.getGlyphInfos();
+    expect(infos[0].codepoint).to.equal(3); // 'cent.alt2'
+    expect(infos[1].codepoint).to.equal(6); // 'dollar.alt2'
   });
 });
