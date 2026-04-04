@@ -14,7 +14,7 @@ use fea_rs::{
     typed::{AstNode, Feature},
     DiagnosticSet, GlyphMap,
 };
-use fontbe::features::{feature_variations::FeatureVariationsProvider, FeaVariationInfo};
+use fontbe::features::{FeaVariationInfo, FeatureVariationsProvider};
 use fontdrasil::{
     coords::{CoordConverter, DesignCoord, UserCoord},
     types::{Axis, GlyphName},
