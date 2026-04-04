@@ -509,4 +509,33 @@ feature kern {
     expect(infos[0].codepoint).to.equal(3); // 'cent.alt2'
     expect(infos[1].codepoint).to.equal(6); // 'dollar.alt2'
   });
+
+  it('Build font with feature variations with unknown glyph name should fail', function () {
+    const unitsPerEm = 1000;
+    const glyphOrder = ['.notdef', 'cent', 'dollar'];
+    const axes = [
+      { tag: 'wght', minValue: 100, defaultValue: 400, maxValue: 900 },
+    ];
+    const featureSource = 'languagesystem DFLT dflt;';
+    const glyphClasses = {};
+    const featureVariations = [
+      {
+        featureTags: ["rvrn"],
+        rules: [
+          [[{ "wght": [500, 900] }], { "cent": "cent.alt1" }],
+        ]
+      }
+    ];
+
+    expect(() =>
+      buildShaperFont(
+        unitsPerEm,
+        glyphOrder,
+        featureSource,
+        axes,
+        glyphClasses,
+        featureVariations,
+      ),
+    ).to.throw(/not found in glyph order/);
+  });
 });

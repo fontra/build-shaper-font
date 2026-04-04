@@ -74,13 +74,28 @@ struct FeatureVariationInput {
     rules: Vec<(ConditionsInput, SubstitutionsInput)>,
 }
 
-fn to_variable_feature(inputs: Vec<FeatureVariationInput>) -> VariableFeature {
+fn to_variable_feature(
+    inputs: Vec<FeatureVariationInput>,
+    glyph_order: &[String],
+) -> Result<VariableFeature, String> {
     let mut features = Vec::new();
     let mut rules = Vec::new();
 
     for input in inputs {
         features.extend(input.feature_tags.iter().map(|t| Tag::from_str(t).unwrap()));
         for (conditions, substitutions) in input.rules {
+            for (from, to) in &substitutions {
+                if !glyph_order.iter().any(|g| g == from) {
+                    return Err(format!(
+                        "glyph '{from}' in feature variation substitution not found in glyph order"
+                    ));
+                }
+                if !glyph_order.iter().any(|g| g == to) {
+                    return Err(format!(
+                        "glyph '{to}' in feature variation substitution not found in glyph order"
+                    ));
+                }
+            }
             rules.push(Rule {
                 conditions: vec![conditions
                     .into_iter()
@@ -102,7 +117,7 @@ fn to_variable_feature(inputs: Vec<FeatureVariationInput>) -> VariableFeature {
         }
     }
 
-    VariableFeature { features, rules }
+    Ok(VariableFeature { features, rules })
 }
 
 #[derive(Clone, Serialize)]
@@ -264,18 +279,23 @@ pub fn build_shaper_font(
         return Ok(res.into_js());
     }
 
-    let feat_vars_provider = feat_vars.filter(|v| !v.is_empty()).map(|v| {
-        let sm = static_metadata
-            .as_ref()
-            .expect("axes required for feature variations");
-        let var_feat = to_variable_feature(v);
-        let ir_glyph_order: GlyphOrder = glyph_order
-            .iter()
-            .map(|s| GlyphName::from(s.as_str()))
-            .collect();
-        FeatureVariationsProvider::new(&var_feat, sm, &ir_glyph_order)
-            .expect("failed to build feature variations")
-    });
+    let feat_vars_provider = match feat_vars.filter(|v| !v.is_empty()) {
+        Some(v) => {
+            let sm = static_metadata
+                .as_ref()
+                .expect("axes required for feature variations");
+            let var_feat = to_variable_feature(v, &glyph_order).map_err(|e| JsError::new(&e))?;
+            let ir_glyph_order: GlyphOrder = glyph_order
+                .iter()
+                .map(|s| GlyphName::from(s.as_str()))
+                .collect();
+            Some(
+                FeatureVariationsProvider::new(&var_feat, sm, &ir_glyph_order)
+                    .expect("failed to build feature variations"),
+            )
+        }
+        None => None,
+    };
 
     match compile::compile(
         &tree,
