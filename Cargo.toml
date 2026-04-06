@@ -15,10 +15,10 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 wasm-bindgen = "0.2.84"
-fea-rs = { git = "https://github.com/khaledhosny/fontc", branch = "feature-variations" }
-fontbe = { git = "https://github.com/khaledhosny/fontc", branch = "feature-variations" }
-fontdrasil = { git = "https://github.com/khaledhosny/fontc", branch = "feature-variations" }
-fontir = { git = "https://github.com/khaledhosny/fontc", branch = "feature-variations" }
+fea-rs = { git = "https://github.com/googlefonts/fontc", branch = "main" }
+fontbe = { git = "https://github.com/googlefonts/fontc", branch = "main" }
+fontdrasil = { git = "https://github.com/googlefonts/fontc", branch = "main" }
+fontir = { git = "https://github.com/googlefonts/fontc", branch = "main" }
 write-fonts = "0.44.1"
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
