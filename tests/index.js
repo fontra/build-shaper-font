@@ -538,4 +538,42 @@ feature kern {
       ),
     ).to.throw(/not found in glyph order/);
   });
+
+  it('Build font with Debg table', async function () {
+    const unitsPerEm = 1000;
+    const glyphOrder = ['.notdef', 'A', 'V'];
+    const featureSource = `
+languagesystem DFLT dflt;
+
+lookup kern_1 {
+   pos A V -50;
+} kern_1;
+
+feature kern {
+   lookup kern_1;
+} kern;
+`;
+    const { fontData } = buildShaperFont(
+      unitsPerEm,
+      glyphOrder,
+      featureSource,
+      undefined,
+      undefined,
+      undefined,
+      true
+    );
+    expect(fontData).to.not.equal(null);
+
+    let hb = await harfbuzz;
+    const blob = hb.createBlob(fontData);
+    const face = hb.createFace(blob);
+
+    const debgTable = face.reference_table('Debg');
+    expect(debgTable).to.not.equal(undefined);
+
+    const debgJson = JSON.parse(new TextDecoder().decode(debgTable));
+    const debgData = debgJson['com.github.fonttools.feaLib'];
+    expect(debgData).to.not.equal(undefined);
+    expect(debgData['GPOS']).to.deep.equal({ '0': ['features.fea:4:7', "kern_1", null] });
+  });
 });

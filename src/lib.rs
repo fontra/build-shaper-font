@@ -194,6 +194,7 @@ pub fn build_shaper_font(
     axes: JsValue,
     #[wasm_bindgen(js_name = "glyphClasses")] glyph_classes: JsValue,
     #[wasm_bindgen(js_name = "featureVariations")] feature_variations: JsValue,
+    #[wasm_bindgen(js_name = "compileDebg")] compile_debg: Option<bool>,
 ) -> Result<JsValue, JsError> {
     set_panic_hook();
 
@@ -302,7 +303,7 @@ pub fn build_shaper_font(
         &glyph_map,
         variation_info.as_ref(),
         feat_vars_provider.as_ref(),
-        Opts::default(),
+        Opts::default().compile_debg(compile_debg.unwrap_or(false)),
     ) {
         Ok((mut compilation, diagnostics)) => {
             res.add_diagnostics(&diagnostics, &tree);
