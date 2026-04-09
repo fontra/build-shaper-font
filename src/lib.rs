@@ -186,27 +186,29 @@ fn set_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Options {
+    axes: Option<Vec<AxisInfo>>,
+    glyph_classes: Option<GlyphClasses>,
+    feature_variations: Option<Vec<FeatureVariationInput>>,
+    compile_debg: Option<bool>,
+}
+
 #[wasm_bindgen(js_name = buildShaperFont)]
 pub fn build_shaper_font(
     #[wasm_bindgen(js_name = "unitsPerEm")] units_per_em: u16,
     #[wasm_bindgen(js_name = "glyphOrder")] glyph_order: Vec<String>,
     #[wasm_bindgen(js_name = "featureSource")] feature_source: String,
-    axes: JsValue,
-    #[wasm_bindgen(js_name = "glyphClasses")] glyph_classes: JsValue,
-    #[wasm_bindgen(js_name = "featureVariations")] feature_variations: JsValue,
-    #[wasm_bindgen(js_name = "compileDebg")] compile_debg: Option<bool>,
+    options: JsValue,
 ) -> Result<JsValue, JsError> {
     set_panic_hook();
 
-    let axes: Option<Vec<AxisInfo>> =
-        serde_wasm_bindgen::from_value(axes).map_err(|e| JsError::new(&e.to_string()))?;
-
-    let gdef_classes: Option<GlyphClasses> =
-        serde_wasm_bindgen::from_value(glyph_classes).map_err(|e| JsError::new(&e.to_string()))?;
-
-    let feat_vars: Option<Vec<FeatureVariationInput>> =
-        serde_wasm_bindgen::from_value(feature_variations)
-            .map_err(|e| JsError::new(&e.to_string()))?;
+    let options: Options = serde_wasm_bindgen::from_value(options).unwrap_or_default();
+    let axes = options.axes;
+    let gdef_classes = options.glyph_classes;
+    let feat_vars = options.feature_variations;
+    let compile_debg = options.compile_debg;
 
     let glyph_map: GlyphMap = glyph_order.iter().map(|s| s.as_str()).collect();
 
