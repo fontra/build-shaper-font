@@ -434,7 +434,7 @@ feature kern {
     ];
     const featureSource = 'languagesystem DFLT dflt;';
     const glyphClasses = {};
-    const featureVariations = [
+    const conditionalSubstitutions = [
       {
         featureTags: ["rvrn"],
         rules: [
@@ -446,7 +446,7 @@ feature kern {
       }
     ];
 
-    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource, axes, glyphClasses, featureVariations });
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource, axes, glyphClasses, conditionalSubstitutions });
     expect(fontData).to.not.equal(null);
 
     let hb = await harfbuzz;
@@ -518,7 +518,7 @@ feature kern {
     ];
     const featureSource = 'languagesystem DFLT dflt;';
     const glyphClasses = {};
-    const featureVariations = [
+    const conditionalSubstitutions = [
       {
         featureTags: ["rvrn"],
         rules: [
@@ -531,7 +531,7 @@ feature kern {
       buildShaperFont(
         unitsPerEm,
         glyphOrder,
-        { featureSource, axes, glyphClasses, featureVariations },
+        { featureSource, axes, glyphClasses, conditionalSubstitutions },
       ),
     ).to.throw(/not found in glyph order/);
   });
