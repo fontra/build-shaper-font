@@ -193,7 +193,7 @@ struct Options {
     feature_source: String,
     axes: Option<Vec<AxisInfo>>,
     glyph_classes: Option<GlyphClasses>,
-    feature_variations: Option<Vec<FeatureVariationInput>>,
+    conditional_substitutions: Option<Vec<FeatureVariationInput>>,
     compile_debg: Option<bool>,
 }
 
@@ -209,7 +209,7 @@ pub fn build_shaper_font(
     let feature_source = options.feature_source;
     let axes = options.axes;
     let gdef_classes = options.glyph_classes;
-    let feat_vars = options.feature_variations;
+    let feat_vars = options.conditional_substitutions;
     let compile_debg = options.compile_debg;
 
     let glyph_map: GlyphMap = glyph_order.iter().map(|s| s.as_str()).collect();
