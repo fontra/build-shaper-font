@@ -1,6 +1,8 @@
-import { expect } from 'chai';
+import { describe, it, expect } from 'vitest';
 import { buildShaperFont } from '../pkg/build_shaper_font.js';
-import harfbuzz from "harfbuzzjs";
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const harfbuzz = require("harfbuzzjs");
 
 describe('buildShaperFont', function () {
   it('Build font with feature data', function () {
