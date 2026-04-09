@@ -189,6 +189,8 @@ fn set_panic_hook() {
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Options {
+    #[serde(default)]
+    feature_source: String,
     axes: Option<Vec<AxisInfo>>,
     glyph_classes: Option<GlyphClasses>,
     feature_variations: Option<Vec<FeatureVariationInput>>,
@@ -199,12 +201,12 @@ struct Options {
 pub fn build_shaper_font(
     #[wasm_bindgen(js_name = "unitsPerEm")] units_per_em: u16,
     #[wasm_bindgen(js_name = "glyphOrder")] glyph_order: Vec<String>,
-    #[wasm_bindgen(js_name = "featureSource")] feature_source: String,
     options: JsValue,
 ) -> Result<JsValue, JsError> {
     set_panic_hook();
 
     let options: Options = serde_wasm_bindgen::from_value(options).unwrap_or_default();
+    let feature_source = options.feature_source;
     let axes = options.axes;
     let gdef_classes = options.glyph_classes;
     let feat_vars = options.feature_variations;

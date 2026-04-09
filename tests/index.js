@@ -16,7 +16,7 @@ feature kern {
 feature curs {
 } curs;
  `;
-    const { fontData, insertMarkers, messages } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
+    const { fontData, insertMarkers, messages } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource });
     expect(fontData).to.not.equal(null);
     expect(insertMarkers).to.deep.equal([
       { tag: 'mark', lookupId: undefined },
@@ -34,7 +34,7 @@ feature aalt {
     feature liga;
 } aalt;
 `;
-    const { fontData, messages, formattedMessages, insertMarkers } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
+    const { fontData, messages, formattedMessages, insertMarkers } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource });
     expect(fontData).to.not.equal(undefined);
     expect(messages[0].level).to.equal('warning');
     expect(messages[0].text).to.equal('Referenced feature not found.');
@@ -57,7 +57,7 @@ in features.fea at 4:12
     const unitsPerEm = 2000;
     const glyphOrder = ['.notdef'];
     const featureSource = "languagesystem DFLT dflt";
-    const { fontData, messages, formattedMessages } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
+    const { fontData, messages, formattedMessages } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource });
     expect(fontData).to.equal(undefined);
     expect(messages[0].level).to.equal('error');
     expect(messages[0].text).to.equal("Expected ';'");
@@ -81,7 +81,7 @@ feature aalt {
     feature liga;
 } aalt;
  `;
-    const { fontData, messages } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
+    const { fontData, messages } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource });
     expect(fontData).to.not.equal(undefined);
     expect(messages[0].level).to.equal('warning');
     expect(messages[0].text).to.equal('Referenced feature not found.');
@@ -107,7 +107,7 @@ feature mkmk {
     pos A V -20;
 } mkmk;
 `;
-    const { fontData, insertMarkers } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
+    const { fontData, insertMarkers } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource });
     expect(fontData).to.not.equal(null);
     expect(insertMarkers).to.deep.equal([
       { tag: 'kern', lookupId: 1 },
@@ -138,7 +138,7 @@ feature mark {
     # Automatic Code
 } mark;
 `;
-    const { insertMarkers } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
+    const { insertMarkers } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource });
     expect(insertMarkers).to.deep.equal([
       { tag: 'kern', lookupId: 0 },
       { tag: 'curs', lookupId: 0 },
@@ -152,7 +152,7 @@ feature mark {
     const glyphOrder = ['.notdef', 'A', 'V'];
     const featureSource = '';
     const axes = [{ tag: 'wght', minValue: 100, defaultValue: 400, maxValue: 900 }];
-    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, { axes });
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource, axes });
     expect(fontData).to.not.equal(null);
 
     let hb = await harfbuzz;
@@ -174,7 +174,7 @@ feature kern {
 } kern;
  `;
     const axes = [{ tag: 'wght', minValue: 100, defaultValue: 400, maxValue: 900 }];
-    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, { axes });
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource, axes });
     expect(fontData).to.not.equal(null);
 
     let hb = await harfbuzz;
@@ -234,7 +234,7 @@ feature kern {
     pos A V -50;
 } kern;
 `;
-    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource);
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource });
 
     let hb = await harfbuzz;
 
@@ -282,7 +282,7 @@ table name {
 } name;
 `;
     const axes = [{ tag: 'wght', minValue: 100, defaultValue: 400, maxValue: 900 }];
-    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, { axes });
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource, axes });
     expect(fontData).to.not.equal(null);
   });
 
@@ -295,7 +295,7 @@ table name {
       mark: ['markGlyph'],
       component: ['componentGlyph']
     };
-    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, '', { glyphClasses });
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, { glyphClasses });
     expect(fontData).to.not.equal(null);
 
     let hb = await harfbuzz;
@@ -315,7 +315,7 @@ table name {
     const glyphClasses = {
       mark: ['markGlyph'],
     };
-    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, '', { glyphClasses });
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, { glyphClasses });
     expect(fontData).to.not.equal(null);
 
     let hb = await harfbuzz;
@@ -343,7 +343,7 @@ table GDEF {
       mark: ['ligatureGlyph'],
       component: ['baseGlyph']
     };
-    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, { glyphClasses });
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource, glyphClasses });
     expect(fontData).to.not.equal(null);
 
     let hb = await harfbuzz;
@@ -371,7 +371,7 @@ feature kern {
     const glyphClasses = {
       base: ['A', 'V'],
     };
-    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, { axes, glyphClasses });
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource, axes, glyphClasses });
     expect(fontData).to.not.equal(null);
 
     let hb = await harfbuzz;
@@ -446,7 +446,7 @@ feature kern {
       }
     ];
 
-    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, featureSource, { axes, glyphClasses, featureVariations });
+    const { fontData } = buildShaperFont(unitsPerEm, glyphOrder, { featureSource, axes, glyphClasses, featureVariations });
     expect(fontData).to.not.equal(null);
 
     let hb = await harfbuzz;
@@ -531,8 +531,7 @@ feature kern {
       buildShaperFont(
         unitsPerEm,
         glyphOrder,
-        featureSource,
-        { axes, glyphClasses, featureVariations },
+        { featureSource, axes, glyphClasses, featureVariations },
       ),
     ).to.throw(/not found in glyph order/);
   });
@@ -554,8 +553,7 @@ feature kern {
     const { fontData } = buildShaperFont(
       unitsPerEm,
       glyphOrder,
-      featureSource,
-      { compileDebg: true }
+      { featureSource, compileDebg: true }
     );
     expect(fontData).to.not.equal(null);
 
