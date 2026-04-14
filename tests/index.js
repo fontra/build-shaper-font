@@ -42,7 +42,7 @@ feature aalt {
     expect(messages[0].text).to.equal('Referenced feature not found.');
     expect(featureSource.substring(...messages[0].span)).to.equal('liga');
     expect(formattedMessages).to.equal(`warning: Referenced feature not found.
-in features.fea at 4:12
+in <features> at 4:12
   | 
 4 |     feature liga;
   |             ^^^^
@@ -65,7 +65,7 @@ in features.fea at 4:12
     expect(messages[0].text).to.equal("Expected ';'");
     expect(messages[0].span).to.deep.equal([featureSource.length, featureSource.length + 1]);
     expect(formattedMessages).to.equal(`error: Expected ';'
-in features.fea at 1:24
+in <features> at 1:24
   | 
 1 | languagesystem DFLT dflt
   |                         ^
@@ -569,6 +569,6 @@ feature kern {
     const debgJson = JSON.parse(new TextDecoder().decode(debgTable));
     const debgData = debgJson['com.github.fonttools.feaLib'];
     expect(debgData).to.not.equal(undefined);
-    expect(debgData['GPOS']).to.deep.equal({ '0': ['features.fea:4:7', "kern_1", null] });
+    expect(debgData['GPOS']).to.deep.equal({ '0': ['<features>:4:7', "kern_1", null] });
   });
 });

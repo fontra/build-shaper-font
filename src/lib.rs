@@ -214,7 +214,7 @@ pub fn build_shaper_font(
 
     let glyph_map: GlyphMap = glyph_order.iter().map(|s| s.as_str()).collect();
 
-    const SRC_NAME: &str = "features.fea";
+    const SRC_NAME: &str = "<features>";
     let (tree, diagnostics) = match parse_root(
         SRC_NAME.into(),
         Some(&glyph_map),
