@@ -39,3 +39,10 @@ Then use npm to test the project:
 npm install
 npm test
 ```
+
+## Releasing
+
+1. Update the version number in [`Cargo.toml`](./Cargo.toml)
+2. Commit the change with the release number in the commit message, e.g. `git commit -a -m "0.1.6"`
+3. Create a matching tag, with `v` prefix, preferably signed, e.g. `git tag -s -m "0.1.6" v0.1.6`
+4. Push. Publishing to npm will happen automatically if CI build passes.
