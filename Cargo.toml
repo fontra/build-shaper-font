@@ -19,7 +19,7 @@ fea-rs = { git = "https://github.com/googlefonts/fontc", branch = "main" }
 fontbe = { git = "https://github.com/googlefonts/fontc", branch = "main" }
 fontdrasil = { git = "https://github.com/googlefonts/fontc", branch = "main" }
 fontir = { git = "https://github.com/googlefonts/fontc", branch = "main" }
-write-fonts = "0.47"
+write-fonts = "0.48"
 
 console_error_panic_hook = { version = "0.1.7", optional = true }
 serde = { version = "1.0", features = ["derive"] }
