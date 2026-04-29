@@ -317,7 +317,7 @@ pub fn build_shaper_font(
 
             // Build insert markers from the Compilation result
             let mut insert_markers: Vec<_> = compilation.insert_markers.iter().collect();
-            insert_markers.sort_by(|(_, a), (_, b)| a.priority.cmp(&b.priority));
+            insert_markers.sort_by_key(|(_, a)| a.priority);
             let mut insert_markers: Vec<InsertMarker> = insert_markers
                 .into_iter()
                 .map(|(tag, point)| InsertMarker {
