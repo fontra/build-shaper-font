@@ -440,7 +440,7 @@ feature kern {
       {
         featureTags: ["rvrn"],
         rules: [
-          [[{ "wght": [null, 600] }], { "dollar": "dollar.alt1" }],
+          [[{ wght: [null, 600] }, { wght: [800, null] }, { wdth: [200, 300] }], { "dollar": "dollar.alt1" }],
           [[{ "wght": [600, 900] }], { "dollar": "dollar.alt2" }],
           [[{ "wdth": [500, 700] }], { "cent": "cent.alt1" }],
           [[{ "wdth": [700, null] }], { "cent": "cent.alt2" }],
@@ -510,6 +510,24 @@ feature kern {
     infos = buffer.getGlyphInfos();
     expect(infos[0].codepoint).to.equal(3); // 'cent.alt2'
     expect(infos[1].codepoint).to.equal(6); // 'dollar.alt2'
+
+    font.setVariations({ 'wdth': 250, 'wght': 700 });
+    buffer.clearContents();
+    buffer.addText(text);
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    infos = buffer.getGlyphInfos();
+    expect(infos[0].codepoint).to.equal(1); // 'cent'
+    expect(infos[1].codepoint).to.equal(5); // 'dollar.alt1'
+
+    font.setVariations({ 'wdth': 400, 'wght': 850 });
+    buffer.clearContents();
+    buffer.addText(text);
+    buffer.guessSegmentProperties();
+    hb.shape(font, buffer);
+    infos = buffer.getGlyphInfos();
+    expect(infos[0].codepoint).to.equal(1); // 'cent'
+    expect(infos[1].codepoint).to.equal(5); // 'dollar.alt1'
   });
 
   it('Build font with feature variations with unknown glyph name should fail', function () {
