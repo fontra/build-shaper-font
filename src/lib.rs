@@ -97,15 +97,18 @@ fn to_variable_feature(
                 }
             }
             rules.push(Rule {
-                conditions: vec![conditions
+                conditions: conditions
                     .into_iter()
-                    .flat_map(|m| m.into_iter())
-                    .map(|(axis_tag, (min, max))| Condition {
-                        axis: Tag::from_str(&axis_tag).unwrap(),
-                        min: min.map(DesignCoord::new),
-                        max: max.map(DesignCoord::new),
+                    .map(|m| {
+                        m.into_iter()
+                            .map(|(axis_tag, (min, max))| Condition {
+                                axis: Tag::from_str(&axis_tag).unwrap(),
+                                min: min.map(DesignCoord::new),
+                                max: max.map(DesignCoord::new),
+                            })
+                            .collect()
                     })
-                    .collect()],
+                    .collect(),
                 substitutions: substitutions
                     .into_iter()
                     .map(|(from, to)| Substitution {
