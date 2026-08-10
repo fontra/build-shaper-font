@@ -215,7 +215,8 @@ pub fn build_shaper_font(
     let feat_vars = options.conditional_substitutions;
     let compile_debg = options.compile_debg;
 
-    let glyph_map: GlyphMap = glyph_order.iter().map(|s| s.as_str()).collect();
+    let glyph_map = GlyphMap::new(glyph_order.iter().map(|s| s.as_str()))
+        .map_err(|e| JsError::new(&e.to_string()))?;
 
     const SRC_NAME: &str = "<features>";
     let (tree, diagnostics) = match parse_root(
